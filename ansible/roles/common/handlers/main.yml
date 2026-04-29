@@ -1,0 +1,9 @@
+---
+- name: Restart dnf-automatic timer
+  ansible.builtin.systemd:
+    name: dnf-automatic.timer
+    state: restarted
+
+- name: Reload systemd for auto-reboot
+  ansible.builtin.systemd:
+    daemon_reload: true

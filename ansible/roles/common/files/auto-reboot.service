@@ -1,0 +1,10 @@
+[Unit]
+Description=Reboot host if pending updates require it
+Documentation=man:dnf-needs-restarting(1)
+ConditionPathExists=!/run/nologin
+
+[Service]
+Type=oneshot
+# `dnf needs-restarting -r` exits 1 when a reboot is required, 0 otherwise.
+# Only reboot in that case.
+ExecStart=/bin/sh -c '/usr/bin/dnf -q needs-restarting -r; if [ $? -eq 1 ]; then /usr/bin/logger -t auto-reboot "Rebooting: pending updates require it"; /usr/bin/systemctl reboot; fi'

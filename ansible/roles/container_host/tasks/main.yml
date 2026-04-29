@@ -1,0 +1,63 @@
+---
+# ----------------------------------------------------------------------------
+# Container runtime + Podman Quadlet deployment for the dev_blog stack.
+# ----------------------------------------------------------------------------
+
+- name: Install Podman + container runtime dependencies
+  ansible.builtin.dnf:
+    name:
+      - podman
+      - containers-common
+      - crun
+      - netavark
+      - aardvark-dns
+      - slirp4netns
+      - fuse-overlayfs
+      - passt
+      - skopeo
+      - buildah
+      - container-selinux
+    state: present
+
+- name: Ensure /etc/containers/systemd exists for Quadlet units
+  ansible.builtin.file:
+    path: "{{ quadlet_dest_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Sync static Quadlet units (network + volumes)
+  ansible.posix.synchronize:
+    src: "{{ quadlet_src_dir }}/"
+    dest: "{{ quadlet_dest_dir }}/"
+    delete: false
+    rsync_opts:
+      - "--exclude=*.container"
+      - "--chmod=F0644,D0755"
+      - "--chown=root:root"
+  notify: Reload systemd and restart dev_blog
+
+- name: Render app Quadlet (Image= → GHCR ref)
+  ansible.builtin.copy:
+    dest: "{{ quadlet_dest_dir }}/dev-blog-app.container"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ lookup('file', quadlet_src_dir ~ '/dev-blog-app.container') | regex_replace('(?m)^Image=.*$', 'Image=' ~ image_app) }}"
+  notify: Reload systemd and restart dev_blog
+
+- name: Render Caddy Quadlet (Image= → GHCR ref)
+  ansible.builtin.copy:
+    dest: "{{ quadlet_dest_dir }}/dev-blog-caddy.container"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ lookup('file', quadlet_src_dir ~ '/dev-blog-caddy.container') | regex_replace('(?m)^Image=.*$', 'Image=' ~ image_caddy) }}"
+  notify: Reload systemd and restart dev_blog
+
+- name: Ensure podman.socket is available (for healthchecks / API)
+  ansible.builtin.systemd:
+    name: podman.socket
+    enabled: true
+    state: started

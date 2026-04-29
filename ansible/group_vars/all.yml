@@ -1,0 +1,40 @@
+---
+# ----------------------------------------------------------------------------
+# Shared variables for the dev_blog production host.
+# ----------------------------------------------------------------------------
+
+# SSH access
+ssh_port: 22
+
+# Public web ports terminated by Caddy.
+http_port:  80
+https_port: 443
+
+# Where Caddy + Coraza write logs on the host. This directory is bind-mounted
+# into the Caddy container, and is the file path that fail2ban tails.
+caddy_log_dir: /var/log/caddy
+
+# Automated updates: only security errata are applied automatically.
+dnf_automatic_apply_updates: true
+dnf_automatic_upgrade_type: security
+
+# fail2ban thresholds for the Caddy/Coraza jail.
+f2b_findtime: 10m
+f2b_bantime:  1h
+f2b_maxretry: 5
+
+# Quadlet units shipped from the repo.
+quadlet_src_dir: "{{ playbook_dir }}/../quadlet"
+quadlet_dest_dir: /etc/containers/systemd
+
+# ----------------------------------------------------------------------------
+# Container images on GHCR. Set `image_tag`, `ghcr_owner`, `ghcr_repo` from
+# CI extra-vars (`-e image_tag=<sha> -e ghcr_owner=...`). Defaults below let
+# the playbook syntax-check without those being provided.
+# ----------------------------------------------------------------------------
+ghcr_owner: "OWNER"
+ghcr_repo:  "dev_blog"
+image_tag:  "latest"
+
+image_app:   "ghcr.io/{{ ghcr_owner }}/{{ ghcr_repo }}/app:{{ image_tag }}"
+image_caddy: "ghcr.io/{{ ghcr_owner }}/{{ ghcr_repo }}/caddy:{{ image_tag }}"

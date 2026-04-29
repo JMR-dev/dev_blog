@@ -47,9 +47,11 @@
 	}
 
 	# ------------------------------------------------------------------
-	# Reverse-proxy to the Astro container on the internal network
+	# Reverse-proxy to the Astro container. Caddy is on the host network
+	# namespace, so we connect over loopback to the port the app container
+	# publishes on 127.0.0.1 / [::1]:4321.
 	# ------------------------------------------------------------------
-	reverse_proxy app:4321 {
+	reverse_proxy 127.0.0.1:4321 {
 		header_up X-Real-IP        {remote_host}
 		header_up X-Forwarded-Proto {scheme}
 	}
@@ -64,7 +66,11 @@
 	}
 
 	log {
-		output stdout
-		format console
+		output file /var/log/caddy/access.log {
+			roll_size     10MiB
+			roll_keep     5
+			roll_keep_for 168h
+		}
+		format json
 	}
 }

@@ -1,0 +1,52 @@
+---
+- name: Install fail2ban (from EPEL)
+  ansible.builtin.dnf:
+    name: fail2ban
+    state: present
+
+- name: Ensure Caddy log directory exists (host-side, bind-mounted into container)
+  ansible.builtin.file:
+    path: "{{ caddy_log_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+    setype: container_file_t
+
+- name: Ensure log files exist so fail2ban can start tailing them
+  ansible.builtin.file:
+    path: "{{ caddy_log_dir }}/{{ item }}"
+    state: touch
+    owner: root
+    group: root
+    mode: "0644"
+    setype: container_file_t
+    modification_time: preserve
+    access_time: preserve
+  loop:
+    - access.log
+    - coraza-audit.log
+
+- name: Deploy Caddy/Coraza fail2ban filter
+  ansible.builtin.copy:
+    src: caddy-coraza.filter
+    dest: /etc/fail2ban/filter.d/caddy-coraza.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Deploy fail2ban jail.local
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Enable fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: true
+    state: started

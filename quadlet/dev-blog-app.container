@@ -23,8 +23,11 @@ ReadOnly=true
 DropCapability=ALL
 Tmpfs=/tmp:rw,size=64m,mode=1777
 
-# Not exposed publicly – Caddy reverse-proxies in over the internal network.
-# PublishPort=4321:4321
+# Caddy now runs on the host network namespace, so it cannot reach the app
+# via podman DNS (`app:4321`). Publish the app port on the host's *loopback*
+# only -- it is reachable to Caddy on the host but not from outside.
+PublishPort=127.0.0.1:4321:4321
+PublishPort=[::1]:4321:4321
 
 [Service]
 Restart=on-failure

@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily 02:00 America/Chicago reboot check (if updates require it)
+
+[Timer]
+# 02:00 Central time, DST-aware.
+OnCalendar=*-*-* 02:00:00 America/Chicago
+Persistent=true
+RandomizedDelaySec=5m
+Unit=auto-reboot.service
+
+[Install]
+WantedBy=timers.target

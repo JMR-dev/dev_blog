@@ -1,0 +1,9 @@
+all:
+  children:
+    blog:
+      hosts:
+        dev-blog-prod:
+          # Public IP of the Vultr instance (set me).
+          ansible_host: 203.0.113.10
+          ansible_user: root
+          ansible_python_interpreter: /usr/bin/python3

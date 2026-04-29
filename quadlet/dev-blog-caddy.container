@@ -9,12 +9,11 @@ ContainerName=dev-blog-caddy
 # Build with:  podman build -t localhost/dev-blog-caddy:latest ./caddy
 Image=localhost/dev-blog-caddy:latest
 
-Network=dev-blog.network
-NetworkAlias=caddy
-
-PublishPort=80:80
-PublishPort=443:443
-PublishPort=443:443/udp
+# Caddy uses the *host* network namespace so it sees real client IP addresses
+# (both v4 and v6). Required for fail2ban / Coraza to act on actual sources
+# instead of the bridge gateway. With Network=host, PublishPort= is a no-op
+# and is intentionally omitted -- Caddy binds 80/443 directly on the host.
+Network=host
 
 # --- Configuration ---
 Environment=SITE_ADDRESS=https://example.com
@@ -32,6 +31,10 @@ Secret=gcp-dns-sa,type=mount,target=gcp-dns.json,mode=0400
 # Persistent state for ACME certificates and Caddy's data directory.
 Volume=caddy-data.volume:/data
 Volume=caddy-config.volume:/config
+
+# Bind-mount the host log directory so fail2ban can tail Caddy access logs
+# and Coraza audit logs. The :Z suffix asks Podman to relabel for SELinux.
+Volume=/var/log/caddy:/var/log/caddy:Z
 
 # Hardening
 NoNewPrivileges=true

@@ -1,0 +1,20 @@
+---
+- name: Configure dev_blog production host (AlmaLinux 10)
+  hosts: blog
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Assert AlmaLinux 10
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'AlmaLinux'
+          - ansible_facts['distribution_major_version'] == '10'
+        fail_msg: "This playbook targets AlmaLinux 10, found {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+
+  roles:
+    - role: common
+    - role: nftables
+    - role: fail2ban
+    - role: registry
+    - role: container_host
