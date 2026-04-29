@@ -57,13 +57,11 @@ open. Issues and PRs welcome.
 </ul>
 
 <h2>Get in touch</h2>
-<p>
-The best way to reach me is on
-<a href={SOCIAL_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
-or
-<a href={SOCIAL_LINKS.mastodon} target="_blank" rel="noopener noreferrer">Mastodon</a>.
-For anything sensitive, ping me for a PGP key.
-</p>
+<ul>
+    <li><strong>Recruiters</strong> &mdash; <a href={SOCIAL_LINKS.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a></li>
+    <li><strong>Technical Practitioners</strong> &mdash; <a href={SOCIAL_LINKS.mastodon} target="_blank" rel="noopener noreferrer">Mastodon</a></li>
+    <li><strong>Developers / Contributors</strong> &mdash; <a href={SOCIAL_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a></li>
+</ul>
 </section>
 </main>
 <Footer />
@@ -80,6 +78,7 @@ max-width: 42rem;
 .page-header {
 display: flex;
 flex-direction: column;
+align-items: flex-start;
 gap: 1rem;
 border-bottom: 1px solid var(--border);
 padding-bottom: 1.5rem;
@@ -116,5 +115,13 @@ color: var(--muted);
 }
 .prose ul li {
 margin-bottom: 0.5em;
+}
+.prose a {
+color: var(--accent-bright);
+text-decoration: underline;
+text-underline-offset: 3px;
+}
+.prose a:hover {
+color: var(--accent);
 }
 </style>

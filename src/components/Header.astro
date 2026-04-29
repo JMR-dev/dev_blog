@@ -89,85 +89,12 @@ const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
 				<span class="brand-text">{SITE_TITLE}</span>
 			</a>
 
-			<nav class="desktop-nav" aria-label="Primary">
+			<nav class="main-nav" aria-label="Primary">
 				{NAV_LINKS.map((link) => <HeaderLink href={link.path}>{link.name}</HeaderLink>)}
 			</nav>
-
-			<button
-				class="menu-toggle"
-				aria-label="Toggle menu"
-				aria-controls="mobile-nav"
-				aria-expanded="false"
-				type="button"
-			>
-				<svg
-					class="icon menu-open"
-					width="24"
-					height="24"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<line x1="4" x2="20" y1="6" y2="6"/>
-					<line x1="4" x2="20" y1="12" y2="12"/>
-					<line x1="4" x2="20" y1="18" y2="18"/>
-				</svg>
-				<svg
-					class="icon menu-close"
-					width="24"
-					height="24"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<path d="M18 6 6 18"/>
-					<path d="m6 6 12 12"/>
-				</svg>
-			</button>
 		</div>
-
-		<nav id="mobile-nav" class="mobile-nav" aria-label="Mobile" hidden>
-			{
-				NAV_LINKS.map((link) => {
-					const active =
-						link.path === '/'
-							? pathname === '/'
-							: pathname === link.path || pathname.startsWith(link.path + '/');
-					return (
-						<a href={link.path} class:list={['mobile-nav-link', { active }]}>
-							{link.name}
-						</a>
-					);
-				})
-			}
-		</nav>
 	</div>
 </header>
-
-<script>
-	const toggle = document.querySelector<HTMLButtonElement>('.menu-toggle');
-	const mobileNav = document.getElementById('mobile-nav');
-	const header = document.querySelector('.site-header');
-	if (toggle && mobileNav && header) {
-		toggle.addEventListener('click', () => {
-			const open = header.classList.toggle('menu-open');
-			toggle.setAttribute('aria-expanded', String(open));
-			if (open) {
-				mobileNav.removeAttribute('hidden');
-			} else {
-				mobileNav.setAttribute('hidden', '');
-			}
-		});
-	}
-</script>
 
 <style>
 	.site-header {
@@ -228,13 +155,6 @@ const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
 		border-bottom: 1px solid var(--border);
 	}
 
-	.nav-inner {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		height: 4rem;
-	}
-
 	.brand {
 		display: inline-flex;
 		align-items: center;
@@ -261,72 +181,57 @@ const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
 		font-weight: 700;
 	}
 
-	.desktop-nav {
-		display: none;
-		gap: 2rem;
-		align-items: center;
-	}
-	@media (min-width: 768px) {
-		.desktop-nav {
-			display: flex;
-		}
-	}
-
-	.menu-toggle {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		background: transparent;
-		border: 0;
-		color: var(--muted);
-		cursor: pointer;
-		padding: 0.5rem;
-	}
-	.menu-toggle:hover {
-		color: var(--text-strong);
-	}
-	@media (min-width: 768px) {
-		.menu-toggle {
-			display: none;
-		}
-	}
-	.menu-toggle .menu-close {
-		display: none;
-	}
-	.site-header.menu-open .menu-toggle .menu-open {
-		display: none;
-	}
-	.site-header.menu-open .menu-toggle .menu-close {
-		display: inline-block;
-	}
-
-	.mobile-nav {
+	.nav-inner {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
-		padding: 0.5rem 1.5rem 1.5rem;
-		background: var(--panel);
-		border-top: 1px solid var(--border);
+		align-items: stretch;
+		padding-top: 0.75rem;
+		padding-bottom: 0.75rem;
+		gap: 0.75rem;
 	}
 	@media (min-width: 768px) {
-		.mobile-nav {
-			display: none !important;
+		.nav-inner {
+			flex-direction: row;
+			justify-content: space-between;
+			align-items: center;
+			height: 4rem;
+			padding-top: 0;
+			padding-bottom: 0;
+			gap: 0;
 		}
 	}
-	.mobile-nav-link {
-		display: block;
-		padding: 0.625rem 0.5rem;
-		margin: 0 -0.5rem;
-		color: var(--muted);
-		font-weight: 500;
-		border-radius: 4px;
+
+	.main-nav {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 0.25rem;
 	}
-	.mobile-nav-link:hover {
-		color: var(--text-strong);
+	@media (min-width: 768px) {
+		.main-nav {
+			display: flex;
+			gap: 2rem;
+		}
+	}
+	.main-nav :global(.header-link) {
+		text-align: center;
+		padding: 0.5rem 0.25rem;
+		border-radius: 4px;
+		background: var(--panel);
+	}
+	@media (min-width: 768px) {
+		.main-nav :global(.header-link) {
+			text-align: left;
+			padding: 0;
+			background: transparent;
+			border-radius: 0;
+		}
+	}
+	.main-nav :global(.header-link:hover) {
 		background: #1f2937;
 	}
-	.mobile-nav-link.active {
-		color: var(--accent-bright);
-		background: #111827;
+	@media (min-width: 768px) {
+		.main-nav :global(.header-link:hover) {
+			background: transparent;
+		}
 	}
 </style>
