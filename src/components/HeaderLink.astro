@@ -4,21 +4,33 @@ import type { HTMLAttributes } from 'astro/types';
 type Props = HTMLAttributes<'a'>;
 
 const { href, class: className, ...props } = Astro.props;
-const pathname = Astro.url.pathname.replace(import.meta.env.BASE_URL, '');
-const subpath = pathname.match(/[^\/]+/g);
-const isActive = href === pathname || href === '/' + (subpath?.[0] || '');
+const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
+const target = (typeof href === 'string' ? href : '').replace(/\/+$/, '') || '/';
+const isActive = target === '/' ? pathname === '/' : pathname === target || pathname.startsWith(target + '/');
 ---
 
-<a href={href} class:list={[className, { active: isActive }]} {...props}>
+<a href={href} class:list={['header-link', className, { active: isActive }]} {...props}>
 	<slot />
 </a>
 <style>
-	a {
+	.header-link {
 		display: inline-block;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--muted);
 		text-decoration: none;
+		transition: color 0.15s ease;
 	}
-	a.active {
-		font-weight: bolder;
+	.header-link:hover {
+		color: var(--accent-bright);
+	}
+	.header-link.active {
+		color: var(--accent-bright);
+		font-weight: 700;
 		text-decoration: underline;
+		text-decoration-thickness: 2px;
+		text-underline-offset: 4px;
+		text-decoration-color: rgba(34, 211, 238, 0.5);
 	}
 </style>
+

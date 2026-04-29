@@ -1,0 +1,73 @@
+---
+- name: Install EPEL release
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+- name: Install base packages
+  ansible.builtin.dnf:
+    name:
+      - dnf-automatic
+      - chrony
+      - curl
+      - tar
+      - vim-enhanced
+      - policycoreutils-python-utils
+      - logrotate
+      - rsync
+    state: present
+
+- name: Ensure chrony is running
+  ansible.builtin.systemd:
+    name: chronyd
+    enabled: true
+    state: started
+
+- name: Configure dnf-automatic for security updates
+  ansible.builtin.copy:
+    dest: /etc/dnf/automatic.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (roles/common).
+      [commands]
+      upgrade_type        = {{ dnf_automatic_upgrade_type }}
+      random_sleep        = 360
+      network_online_timeout = 60
+      download_updates    = yes
+      apply_updates       = {{ 'yes' if dnf_automatic_apply_updates else 'no' }}
+      reboot              = never
+      reboot_command      = "shutdown -r now"
+
+      [emitters]
+      emit_via            = stdio
+
+      [base]
+      debuglevel          = 1
+  notify: Restart dnf-automatic timer
+
+- name: Enable dnf-automatic timer
+  ansible.builtin.systemd:
+    name: dnf-automatic.timer
+    enabled: true
+    state: started
+
+- name: Install auto-reboot service + timer (02:00 America/Chicago)
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - auto-reboot.service
+    - auto-reboot.timer
+  notify: Reload systemd for auto-reboot
+
+- name: Enable auto-reboot timer
+  ansible.builtin.systemd:
+    name: auto-reboot.timer
+    enabled: true
+    state: started
+    daemon_reload: true

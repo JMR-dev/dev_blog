@@ -1,0 +1,50 @@
+# Development override – auto-loaded by `podman compose` / `docker compose`
+# when present alongside compose.yaml. Maps Caddy to unprivileged host ports
+# so it works under rootless Podman without tweaking
+# net.ipv4.ip_unprivileged_port_start.
+#
+# It also pins static IPs and adds a /etc/hosts override on the Caddy
+# container to work around aardvark-dns leaving stale records around between
+# rootless `podman compose down` / `up` cycles. Production (Quadlets / `-f
+# compose.yaml`) keeps relying on standard container DNS.
+#
+# Default usage (dev, high ports, plain HTTP):
+#   podman compose up --build
+#   → http://localhost:8080
+#
+# To skip this override and run with prod (low) ports:
+#   podman compose -f compose.yaml up --build
+
+networks:
+  dev-blog:
+    ipam:
+      config:
+        - subnet: 10.89.99.0/24
+
+services:
+  app:
+    networks: !override
+      dev-blog:
+        ipv4_address: 10.89.99.10
+
+  caddy:
+    environment:
+      # In dev we drive listeners from the Caddyfile itself (see below), so
+      # SITE_ADDRESS is unused but kept harmless.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    networks: !override
+      dev-blog:
+        ipv4_address: 10.89.99.11
+    # Pin `app` to the static IP above so we never depend on aardvark-dns,
+    # which is prone to caching stale entries between rootless restarts.
+    extra_hosts:
+      - "app:10.89.99.10"
+    # Swap the production Caddyfile for one that uses `tls internal` so
+    # https://localhost:8443 works without ACME / Cloud DNS credentials.
+    volumes:
+      - ./caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+    # !override replaces the ports list from compose.yaml instead of appending.
+    ports: !override
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+      - "${HTTPS_PORT:-8443}:443/udp"

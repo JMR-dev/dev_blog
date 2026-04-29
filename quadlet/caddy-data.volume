@@ -1,0 +1,8 @@
+[Unit]
+Description=Persistent Caddy data (certificates, ACME state)
+
+[Volume]
+VolumeName=caddy-data
+
+[Install]
+WantedBy=multi-user.target default.target

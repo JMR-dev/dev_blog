@@ -1,0 +1,6 @@
+vultr_api_key  = "REPLACE_ME"
+region         = "sea"
+plan           = "vc2-1c-2gb"
+os_name_filter = "AlmaLinux 10"
+hostname       = "dev-blog"
+ssh_key_ids    = []

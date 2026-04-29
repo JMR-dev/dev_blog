@@ -1,0 +1,245 @@
+name: deploy
+
+# ----------------------------------------------------------------------------
+# Pipeline shape:
+#
+#   build-app ─┐
+#   build-caddy├──► gate ──► push-app   ─┐
+#   infra      ─┘            push-caddy ─┴──► deploy (Ansible)
+#
+# - build-app / build-caddy: build container images, save as tar artifacts.
+# - infra: tofu fmt/validate/plan (PR) or apply (push/dispatch); emits
+#   instance_ip as a job output.
+# - gate: fan-in checkpoint, fails fast if any upstream failed.
+# - push-app / push-caddy: load tar artifact, tag, and push to GHCR.
+# - deploy: run Ansible against the Vultr host, pulling images from GHCR.
+# ----------------------------------------------------------------------------
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY:    ghcr.io
+  IMAGE_APP:   ${{ github.repository }}/app
+  IMAGE_CADDY: ${{ github.repository }}/caddy
+  TAG:         ${{ github.sha }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Parallel build / plan stage
+  # ---------------------------------------------------------------------------
+  build-app:
+    name: Build app image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image with Podman
+        run: |
+          podman build \
+            -t "app:${TAG}" \
+            -f Containerfile \
+            .
+
+      - name: Save image as OCI tar
+        run: podman save -o /tmp/app.tar "app:${TAG}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-app
+          path: /tmp/app.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  build-caddy:
+    name: Build caddy image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image with Podman
+        run: |
+          podman build \
+            -t "caddy:${TAG}" \
+            -f caddy/Containerfile \
+            caddy
+
+      - name: Save image as OCI tar
+        run: podman save -o /tmp/caddy.tar "caddy:${TAG}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-caddy
+          path: /tmp/caddy.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  infra:
+    name: OpenTofu (Vultr / R2)
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: infra
+    outputs:
+      instance_ip: ${{ steps.outputs.outputs.instance_ip }}
+    env:
+      TF_VAR_vultr_api_key:  ${{ secrets.VULTR_API_KEY }}
+      AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET:             ${{ secrets.R2_BUCKET }}
+      R2_ACCOUNT_ID:         ${{ secrets.R2_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.8.5"
+
+      - name: tofu fmt
+        run: tofu fmt -check -recursive
+
+      - name: tofu init (R2 backend)
+        run: |
+          tofu init \
+            -backend-config="bucket=${R2_BUCKET}" \
+            -backend-config="endpoints={ s3 = \"https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com\" }"
+
+      - name: tofu validate
+        run: tofu validate
+
+      - name: tofu apply
+        run: tofu apply -input=false -auto-approve
+
+      - name: Export instance IP
+        id: outputs
+        run: echo "instance_ip=$(tofu output -raw main_ip)" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Quality gate (fan-in)
+  # ---------------------------------------------------------------------------
+  gate:
+    name: Quality gate
+    needs: [build-app, build-caddy, infra]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "build-app, build-caddy, and infra all succeeded."
+
+  # ---------------------------------------------------------------------------
+  # Push to GHCR (parallel, post-gate)
+  # ---------------------------------------------------------------------------
+  push-app:
+    name: Push app → GHCR
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: image-app
+          path: /tmp
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login "${REGISTRY}" -u "${{ github.actor }}" --password-stdin
+
+      - name: Tag and push
+        run: |
+          podman load -i /tmp/app.tar
+          podman tag  "app:${TAG}" "${REGISTRY}/${IMAGE_APP}:${TAG}"
+          podman tag  "app:${TAG}" "${REGISTRY}/${IMAGE_APP}:latest"
+          podman push "${REGISTRY}/${IMAGE_APP}:${TAG}"
+          podman push "${REGISTRY}/${IMAGE_APP}:latest"
+
+  push-caddy:
+    name: Push caddy → GHCR
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: image-caddy
+          path: /tmp
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login "${REGISTRY}" -u "${{ github.actor }}" --password-stdin
+
+      - name: Tag and push
+        run: |
+          podman load -i /tmp/caddy.tar
+          podman tag  "caddy:${TAG}" "${REGISTRY}/${IMAGE_CADDY}:${TAG}"
+          podman tag  "caddy:${TAG}" "${REGISTRY}/${IMAGE_CADDY}:latest"
+          podman push "${REGISTRY}/${IMAGE_CADDY}:${TAG}"
+          podman push "${REGISTRY}/${IMAGE_CADDY}:latest"
+
+  # ---------------------------------------------------------------------------
+  # Deploy with Ansible
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Ansible deploy
+    needs: [push-app, push-caddy, infra]
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: ansible
+    env:
+      ANSIBLE_HOST_KEY_CHECKING: "False"
+      ANSIBLE_FORCE_COLOR: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python + Ansible
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible + collections
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible
+          ansible-galaxy collection install ansible.posix containers.podman
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          INSTANCE_IP:     ${{ needs.infra.outputs.instance_ip }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$INSTANCE_IP" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Render inventory
+        env:
+          INSTANCE_IP: ${{ needs.infra.outputs.instance_ip }}
+        run: |
+          cat > inventory.yml <<EOF
+          all:
+            children:
+              blog:
+                hosts:
+                  dev-blog-prod:
+                    ansible_host: ${INSTANCE_IP}
+                    ansible_user: root
+                    ansible_python_interpreter: /usr/bin/python3
+          EOF
+
+      - name: Run playbook
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          ansible-playbook site.yml \
+            -e "ghcr_owner=${{ github.repository_owner }}" \
+            -e "ghcr_repo=${{ github.event.repository.name }}" \
+            -e "ghcr_user=${{ github.actor }}" \
+            -e "image_tag=${TAG}" \
+            -e "ghcr_pat=${GHCR_PAT}"

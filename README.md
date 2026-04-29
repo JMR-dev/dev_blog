@@ -1,63 +1,58 @@
-# Astro Starter Kit: Blog
+# dev-blog
 
-```sh
-pnpm create astro@latest -- --template blog
+A personal developer blog built to be fast, secure, and entirely self-hosted — no platform lock-in, no third-party runtime dependencies.
+
+## Stack
+
+### Site
+
+- **[Astro v6](https://astro.build)** — generates static HTML at build time, served via `astro preview`. Zero client-side JavaScript by default.
+- **Markdown & MDX** — posts live in `src/content/blog/` as typed Content Collections with frontmatter validation.
+- **RSS feed + sitemap** — auto-generated via `@astrojs/rss` and `@astrojs/sitemap`.
+- **Local fonts** — Atkinson Hyperlegible served from `src/assets/fonts/`, no external font requests.
+- **pnpm** — fast, disk-efficient package management. Requires Node ≥ 22.
+
+### Testing
+
+- **Vitest** — unit and integration tests with v8 coverage.
+- **Playwright** — end-to-end tests against the running site.
+
+## Containers
+
+The entire runtime is two containers communicating over a private bridge network.
+
+```
+Internet ──► Caddy :443 ──► Astro app :4321
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+### App container
 
-Features:
+A two-stage `Containerfile` (Node 24 on Debian slim):
 
-- ✅ Minimal styling (make it your own!)
-- ✅ 100/100 Lighthouse performance
-- ✅ SEO-friendly with canonical URLs and Open Graph data
-- ✅ Sitemap support
-- ✅ RSS Feed support
-- ✅ Markdown & MDX support
+1. **Build stage** — installs deps and runs `astro build`.
+2. **Runtime stage** — copies only `dist/`, `node_modules`, and config. Runs as a non-root `astro` user (UID 1001) with a read-only filesystem, all Linux capabilities dropped, and `no-new-privileges` enforced.
 
-## 🚀 Project Structure
+### Caddy container
 
-Inside of your Astro project, you'll see the following folders and files:
+A custom Caddy build compiled with [`xcaddy`](https://github.com/caddyserver/xcaddy), adding two plugins on top of the official image:
 
-```text
-├── public/
-├── src/
-│   ├── assets/
-│   ├── components/
-│   ├── content/
-│   ├── layouts/
-│   └── pages/
-├── astro.config.mjs
-├── README.md
-├── package.json
-└── tsconfig.json
-```
+- **[coraza-caddy](https://github.com/corazawaf/coraza-caddy)** — the Coraza WAF with the OWASP Core Rule Set (CRS v4.7.0) baked into the image. All traffic is inspected before it reaches the app.
+- **[caddy-dns/googleclouddns](https://github.com/caddy-dns/googleclouddns)** — ACME DNS-01 challenge provider, so TLS certificates are issued and renewed without opening port 80 or requiring a webroot.
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+Caddy also sets hardened response headers (HSTS, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`) and compresses responses with zstd and gzip.
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+### Compose vs. production
 
-The `src/content/` directory contains "collections" of related Markdown and MDX documents. Use `getCollection()` to retrieve posts from `src/content/blog/`, and type-check your frontmatter using an optional schema. See [Astro's Content Collections docs](https://docs.astro.build/en/guides/content-collections/) to learn more.
+- **Local / CI**: `compose.yaml` (+ `compose.override.yaml`) spins up the full stack with `podman compose up --build`.
+- **Production**: [Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) units in `quadlet/` integrate the containers directly with systemd — no compose daemon required.
 
-Any static assets, like images, can be placed in the `public/` directory.
+## Infrastructure
 
-## 🧞 Commands
+All infrastructure is version-controlled and reproducible.
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
-
-## Credit
-
-This theme is based off of the lovely [Bear Blog](https://github.com/HermanMartinus/bearblog/).
+| Layer | Tool | Details |
+|---|---|---|
+| Hosting | **[Vultr](https://www.vultr.com)** | VPS — 1 vCPU / 2 GB RAM, AlmaLinux 10, Seattle (`sea`) region. Reserved IPv4 and IPv6 addresses survive instance replacement. Daily automated backups. |
+| DNS | **[Google Cloud DNS](https://cloud.google.com/dns)** | Authoritative DNS for the site's domain. A service-account key is also used by Caddy's `caddy-dns/googleclouddns` plugin to complete ACME DNS-01 challenges for automatic TLS certificate issuance and renewal. |
+| Cloud provisioning | **OpenTofu** | Manages the Vultr instance and reserved IPs as code. State stored remotely via a Cloudflare R2 backend. |
+| Host configuration | **Ansible** | Roles: `common`, `nftables` (firewall), `fail2ban` (intrusion prevention), `registry` (private container registry), `container_host` (Quadlet + Podman setup). |

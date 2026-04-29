@@ -1,0 +1,37 @@
+# Managed by Ansible (roles/fail2ban).
+
+[DEFAULT]
+banaction       = nftables-multiport
+banaction_allports = nftables-allports
+backend         = auto
+findtime        = {{ f2b_findtime }}
+bantime         = {{ f2b_bantime }}
+maxretry        = {{ f2b_maxretry }}
+# Add private ranges and your own admin IPs here.
+ignoreip        = 127.0.0.1/8 ::1
+
+# ----------------------------------------------------------------------------
+# SSH brute-force protection.
+# ----------------------------------------------------------------------------
+[sshd]
+enabled = true
+port    = {{ ssh_port }}
+
+# ----------------------------------------------------------------------------
+# Caddy + Coraza WAF.
+#
+# Two log sources are watched:
+#   - access.log   : every Caddy response. We ban on repeated 4xx / 403.
+#   - coraza-audit.log : Coraza serial audit log; any entry here means a rule
+#     fired in blocking mode, so a single hit is enough on top of the access
+#     log threshold.
+# ----------------------------------------------------------------------------
+[caddy-coraza]
+enabled  = true
+port     = http,https
+filter   = caddy-coraza
+logpath  = {{ caddy_log_dir }}/access.log
+           {{ caddy_log_dir }}/coraza-audit.log
+maxretry = {{ f2b_maxretry }}
+findtime = {{ f2b_findtime }}
+bantime  = {{ f2b_bantime }}

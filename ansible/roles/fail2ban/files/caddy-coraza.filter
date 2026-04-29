@@ -1,0 +1,26 @@
+# Managed by Ansible (roles/fail2ban).
+#
+# Matches two distinct sources written by the Caddy + Coraza container:
+#
+# 1. Caddy JSON access log entries with HTTP 403 (Coraza denies with 403):
+#    {"level":"info","ts":...,"logger":"http.log.access",
+#     "request":{"remote_ip":"203.0.113.42",...},"status":403, ...}
+#
+# 2. Coraza serial audit-log "A" section data line (the line that follows
+#    the `--xxxx-A--` boundary):
+#       [29/Apr/2026:16:00:00 +0000] unique-id 203.0.113.42 54321 10.0.0.1 80
+#
+# Either pattern produces a hit on <HOST>.
+
+[INCLUDES]
+before = common.conf
+
+[Definition]
+
+failregex = ^.*"remote_ip":"<HOST>"[^\n]*"status":403[^\n]*$
+            ^\[[^\]]+\] \S+ <HOST> \d+ \S+ \d+\s*$
+
+ignoreregex =
+
+datepattern = ^\[%%d/%%b/%%Y:%%H:%%M:%%S %%z\]
+              {^LN-BEG}

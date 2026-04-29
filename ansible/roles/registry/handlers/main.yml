@@ -1,0 +1,19 @@
+---
+- name: Restart dev_blog services
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: Restart dev_blog services
+
+- name: Restart Caddy
+  ansible.builtin.systemd:
+    name: dev-blog-caddy.service
+    state: restarted
+  listen: Restart dev_blog services
+  failed_when: false
+
+- name: Restart app
+  ansible.builtin.systemd:
+    name: dev-blog-app.service
+    state: restarted
+  listen: Restart dev_blog services
+  failed_when: false

@@ -1,0 +1,78 @@
+---
+# ----------------------------------------------------------------------------
+# GHCR registry login + image pull.
+#
+# Required extra-vars (typically set by CI):
+#   ghcr_pat   - GitHub PAT with `read:packages` scope
+#   ghcr_user  - GitHub username that owns the PAT
+#   image_tag  - container tag to pull (e.g. the commit SHA)
+# ----------------------------------------------------------------------------
+
+- name: Assert GHCR variables are set
+  ansible.builtin.assert:
+    that:
+      - ghcr_pat   | default('') | length > 0
+      - ghcr_user  | default('') | length > 0
+      - image_tag  | default('') | length > 0
+    fail_msg: "ghcr_pat, ghcr_user, and image_tag must be provided as extra-vars."
+
+- name: Add GitHub CLI dnf repo
+  ansible.builtin.yum_repository:
+    name: gh-cli
+    description: GitHub CLI
+    baseurl: https://cli.github.com/packages/rpm
+    gpgcheck: true
+    gpgkey: https://cli.github.com/packages/rpm/gh-cli.repo.gpg.key
+    enabled: true
+
+- name: Install gh CLI
+  ansible.builtin.dnf:
+    name: gh
+    state: present
+
+- name: Authenticate gh with the provided PAT
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      printf '%s' "$GHCR_PAT" | gh auth login --hostname github.com --with-token
+      gh auth status --hostname github.com
+  environment:
+    GHCR_PAT: "{{ ghcr_pat }}"
+  register: gh_login
+  changed_when: false
+  no_log: true
+
+- name: Ensure podman auth dir exists
+  ansible.builtin.file:
+    path: /root/.config/containers
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Log podman in to GHCR (uses the same PAT)
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      printf '%s' "$GHCR_PAT" | podman login ghcr.io \
+        --username "{{ ghcr_user }}" \
+        --password-stdin \
+        --authfile /root/.config/containers/auth.json
+  environment:
+    GHCR_PAT: "{{ ghcr_pat }}"
+  changed_when: false
+  no_log: true
+
+- name: Pull the application image from GHCR
+  containers.podman.podman_image:
+    name: "{{ image_app }}"
+    auth_file: /root/.config/containers/auth.json
+    force: true
+  notify: Restart dev_blog services
+
+- name: Pull the Caddy image from GHCR
+  containers.podman.podman_image:
+    name: "{{ image_caddy }}"
+    auth_file: /root/.config/containers/auth.json
+    force: true
+  notify: Restart dev_blog services

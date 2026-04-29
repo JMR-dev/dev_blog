@@ -1,0 +1,76 @@
+# ----------------------------------------------------------------------------
+# Caddyfile – fronts the Astro app, terminates TLS, and runs the Coraza WAF
+# with the OWASP Core Rule Set loaded.
+# ----------------------------------------------------------------------------
+
+{
+	# Make sure the WAF runs before the reverse-proxy handler.
+	order coraza_waf before reverse_proxy
+
+	# Email used for Let's Encrypt account registration.
+	email {$ACME_EMAIL:admin@example.com}
+}
+
+# ----------------------------------------------------------------------------
+# Public site
+# ----------------------------------------------------------------------------
+{$SITE_ADDRESS:http://:80} {
+	encode zstd gzip
+
+	# ------------------------------------------------------------------
+	# WAF – Coraza + OWASP Core Rule Set (Top 10 protections)
+	# ------------------------------------------------------------------
+	coraza_waf {
+		load_owasp_crs
+
+		directives `
+			Include @coraza.conf-recommended
+			Include @crs-setup.conf.example
+			Include @owasp_crs/*.conf
+			SecRuleEngine On
+			SecRequestBodyAccess On
+			SecResponseBodyAccess Off
+			SecDefaultAction "phase:1,log,auditlog,deny,status:403"
+			SecDefaultAction "phase:2,log,auditlog,deny,status:403"
+		`
+	}
+
+	# ------------------------------------------------------------------
+	# TLS via ACME DNS-01 with the Google Cloud DNS provider.
+	# Falls back to no-TLS automatically when SITE_ADDRESS is http://...
+	# ------------------------------------------------------------------
+	tls {
+		dns googleclouddns {
+			gcp_project {$GCP_PROJECT}
+		}
+		resolvers 8.8.8.8 1.1.1.1
+	}
+
+	# ------------------------------------------------------------------
+	# Reverse-proxy to the Astro container. Caddy is on the host network
+	# namespace, so we connect over loopback to the port the app container
+	# publishes on 127.0.0.1 / [::1]:4321.
+	# ------------------------------------------------------------------
+	reverse_proxy 127.0.0.1:4321 {
+		header_up X-Real-IP        {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# Standard hardening headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "SAMEORIGIN"
+		Referrer-Policy           "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size     10MiB
+			roll_keep     5
+			roll_keep_for 168h
+		}
+		format json
+	}
+}

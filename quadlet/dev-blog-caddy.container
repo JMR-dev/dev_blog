@@ -1,0 +1,49 @@
+[Unit]
+Description=Caddy reverse proxy with Coraza WAF (OWASP CRS) and Google Cloud DNS plugin
+Wants=network-online.target
+After=network-online.target dev-blog-app.service
+Requires=dev-blog-app.service
+
+[Container]
+ContainerName=dev-blog-caddy
+# Build with:  podman build -t localhost/dev-blog-caddy:latest ./caddy
+Image=localhost/dev-blog-caddy:latest
+
+# Caddy uses the *host* network namespace so it sees real client IP addresses
+# (both v4 and v6). Required for fail2ban / Coraza to act on actual sources
+# instead of the bridge gateway. With Network=host, PublishPort= is a no-op
+# and is intentionally omitted -- Caddy binds 80/443 directly on the host.
+Network=host
+
+# --- Configuration ---
+Environment=SITE_ADDRESS=https://example.com
+Environment=ACME_EMAIL=admin@example.com
+# Required by the googleclouddns plugin; must match a GCP project that owns
+# the DNS zone for SITE_ADDRESS.
+Environment=GCP_PROJECT=my-gcp-project
+# A Workload-Identity / service-account JSON key mounted read-only below.
+Environment=GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp-dns.json
+
+# Mount the GCP service-account key as a read-only secret.
+# Create with:  podman secret create gcp-dns-sa /path/to/key.json
+Secret=gcp-dns-sa,type=mount,target=gcp-dns.json,mode=0400
+
+# Persistent state for ACME certificates and Caddy's data directory.
+Volume=caddy-data.volume:/data
+Volume=caddy-config.volume:/config
+
+# Bind-mount the host log directory so fail2ban can tail Caddy access logs
+# and Coraza audit logs. The :Z suffix asks Podman to relabel for SELinux.
+Volume=/var/log/caddy:/var/log/caddy:Z
+
+# Hardening
+NoNewPrivileges=true
+DropCapability=ALL
+AddCapability=CAP_NET_BIND_SERVICE
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target

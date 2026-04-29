@@ -1,0 +1,13 @@
+[Unit]
+Description=Internal network for the dev-blog stack
+
+[Network]
+NetworkName=dev-blog
+Driver=bridge
+DisableDNS=false
+IPv6=true
+Subnet=10.89.0.0/24
+Subnet=fd00:dead:beef::/64
+
+[Install]
+WantedBy=multi-user.target default.target
