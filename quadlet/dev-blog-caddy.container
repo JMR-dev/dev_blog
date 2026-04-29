@@ -1,0 +1,46 @@
+[Unit]
+Description=Caddy reverse proxy with Coraza WAF (OWASP CRS) and Google Cloud DNS plugin
+Wants=network-online.target
+After=network-online.target dev-blog-app.service
+Requires=dev-blog-app.service
+
+[Container]
+ContainerName=dev-blog-caddy
+# Build with:  podman build -t localhost/dev-blog-caddy:latest ./caddy
+Image=localhost/dev-blog-caddy:latest
+
+Network=dev-blog.network
+NetworkAlias=caddy
+
+PublishPort=80:80
+PublishPort=443:443
+PublishPort=443:443/udp
+
+# --- Configuration ---
+Environment=SITE_ADDRESS=https://example.com
+Environment=ACME_EMAIL=admin@example.com
+# Required by the googleclouddns plugin; must match a GCP project that owns
+# the DNS zone for SITE_ADDRESS.
+Environment=GCP_PROJECT=my-gcp-project
+# A Workload-Identity / service-account JSON key mounted read-only below.
+Environment=GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp-dns.json
+
+# Mount the GCP service-account key as a read-only secret.
+# Create with:  podman secret create gcp-dns-sa /path/to/key.json
+Secret=gcp-dns-sa,type=mount,target=gcp-dns.json,mode=0400
+
+# Persistent state for ACME certificates and Caddy's data directory.
+Volume=caddy-data.volume:/data
+Volume=caddy-config.volume:/config
+
+# Hardening
+NoNewPrivileges=true
+DropCapability=ALL
+AddCapability=CAP_NET_BIND_SERVICE
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target

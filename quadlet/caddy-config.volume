@@ -1,0 +1,8 @@
+[Unit]
+Description=Persistent Caddy config cache
+
+[Volume]
+VolumeName=caddy-config
+
+[Install]
+WantedBy=multi-user.target default.target

@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1.7
+
+# Build a custom Caddy with the Coraza WAF plugin and the
+# Google Cloud DNS provider for ACME DNS-01 challenges.
+
+ARG CADDY_VERSION=2.11.2
+
+FROM caddy:${CADDY_VERSION}-builder AS builder
+
+# coraza-caddy/v2 requires Go >= 1.25, but the caddy:builder image still ships
+# Go 1.24. GOTOOLCHAIN=auto lets the Go toolchain transparently download the
+# version requested by each module's go.mod.
+ENV GOTOOLCHAIN=auto
+
+RUN xcaddy build \
+    --with github.com/corazawaf/coraza-caddy/v2 \
+    --with github.com/caddy-dns/googleclouddns
+
+
+FROM caddy:${CADDY_VERSION}
+
+# OWASP Core Rule Set (CRS) – pinned, baked into the image so it's available offline.
+ARG CRS_VERSION=4.7.0
+RUN set -eux; \
+    apk add --no-cache --virtual .fetch curl tar; \
+    mkdir -p /etc/caddy/coraza /etc/caddy/coraza/owasp_crs; \
+    curl -fsSL "https://github.com/coreruleset/coreruleset/archive/refs/tags/v${CRS_VERSION}.tar.gz" \
+      -o /tmp/crs.tgz; \
+    tar -xzf /tmp/crs.tgz -C /tmp; \
+    cp -r "/tmp/coreruleset-${CRS_VERSION}/rules"           /etc/caddy/coraza/owasp_crs/rules; \
+    cp    "/tmp/coreruleset-${CRS_VERSION}/crs-setup.conf.example" /etc/caddy/coraza/crs-setup.conf; \
+    curl -fsSL https://raw.githubusercontent.com/corazawaf/coraza/main/coraza.conf-recommended \
+      -o /etc/caddy/coraza/coraza.conf; \
+    rm -rf /tmp/crs.tgz "/tmp/coreruleset-${CRS_VERSION}"; \
+    apk del .fetch
+
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+COPY Caddyfile      /etc/caddy/Caddyfile
+COPY coraza.conf    /etc/caddy/coraza/local.conf

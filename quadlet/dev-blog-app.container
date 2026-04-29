@@ -1,0 +1,34 @@
+[Unit]
+Description=dev-blog Astro application (node:24-trixie-slim)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=dev-blog-app
+# Built from the Containerfile at the repo root.
+# Build with:   podman build -t localhost/dev-blog-app:latest .
+Image=localhost/dev-blog-app:latest
+
+Network=dev-blog.network
+NetworkAlias=app
+
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=4321
+Environment=ASTRO_TELEMETRY_DISABLED=1
+
+# Hardening
+NoNewPrivileges=true
+ReadOnly=true
+DropCapability=ALL
+Tmpfs=/tmp:rw,size=64m,mode=1777
+
+# Not exposed publicly – Caddy reverse-proxies in over the internal network.
+# PublishPort=4321:4321
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target

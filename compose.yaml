@@ -1,0 +1,84 @@
+# Podman-compose / Docker-compose file for the dev-blog stack.
+#
+# This is provided as a convenience for local iteration; production deployments
+# should use the Quadlet units in ./quadlet/ which integrate with systemd.
+#
+# Usage:
+#   podman compose up --build
+#
+# The Caddy container needs a Google Cloud service-account JSON key mounted at
+# /run/secrets/gcp-dns.json for the ACME DNS-01 challenge to work. For local
+# HTTP-only development, set SITE_ADDRESS=http://:80 in your shell or .env.
+
+name: dev-blog
+
+networks:
+  dev-blog:
+    driver: bridge
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/dev-blog-app:latest
+    container_name: dev-blog-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4321"
+      ASTRO_TELEMETRY_DISABLED: "1"
+    networks:
+      - dev-blog
+    expose:
+      - "4321"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    build:
+      context: ./caddy
+      dockerfile: Containerfile
+    image: localhost/dev-blog-caddy:latest
+    container_name: dev-blog-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      SITE_ADDRESS:  ${SITE_ADDRESS:-https://example.com}
+      ACME_EMAIL:    ${ACME_EMAIL:-admin@example.com}
+      GCP_PROJECT:   ${GCP_PROJECT:-my-gcp-project}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-dns.json
+    secrets:
+      - gcp-dns
+    networks:
+      - dev-blog
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+
+secrets:
+  gcp-dns:
+    # Path to a Google Cloud service-account JSON key with permission to
+    # update Cloud DNS records for the SITE_ADDRESS zone.
+    file: ./secrets/gcp-dns.json

@@ -1,0 +1,58 @@
+# Development Caddyfile – local HTTPS via `tls internal` (self-signed, no ACME).
+# Mounted into the Caddy container by compose.override.yaml, replacing the
+# production Caddyfile. Same WAF + reverse-proxy behaviour, just a simpler TLS
+# story so https://localhost:8443 works without any cloud credentials.
+
+{
+	order coraza_waf before reverse_proxy
+	# Disable HTTP→HTTPS auto-redirects in dev (we publish on different ports).
+	auto_https disable_redirects
+}
+
+# Shared handler chain for both the HTTP and HTTPS listeners.
+(site) {
+	encode zstd gzip
+
+	coraza_waf {
+		load_owasp_crs
+
+		directives `
+			Include @coraza.conf-recommended
+			Include @crs-setup.conf.example
+			Include @owasp_crs/*.conf
+			SecRuleEngine On
+			SecRequestBodyAccess On
+			SecResponseBodyAccess Off
+			SecDefaultAction "phase:1,log,auditlog,deny,status:403"
+			SecDefaultAction "phase:2,log,auditlog,deny,status:403"
+		`
+	}
+
+	reverse_proxy app:4321 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options        "SAMEORIGIN"
+		Referrer-Policy        "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# Plain-HTTP listener – the `http://` scheme is needed so Caddy binds :80
+# instead of upgrading these names to HTTPS-only.
+http://localhost, http://127.0.0.1, http://[::1] {
+	import site
+}
+
+# HTTPS listener with a self-signed cert from Caddy's local CA.
+https://localhost, https://127.0.0.1, https://[::1] {
+	tls internal
+	import site
+}

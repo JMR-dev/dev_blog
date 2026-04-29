@@ -1,0 +1,10 @@
+[Unit]
+Description=Internal network for the dev-blog stack
+
+[Network]
+NetworkName=dev-blog
+Driver=bridge
+DisableDNS=false
+
+[Install]
+WantedBy=multi-user.target default.target
