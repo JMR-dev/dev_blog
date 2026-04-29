@@ -12,3 +12,8 @@ backend.hcl
 *.auto.tfvars
 terraform.tfvars
 !terraform.tfvars.example
+
+# Local backend overrides (developer-specific)
+backend_override.tf
+*_override.tf
+!*_override.tf.example

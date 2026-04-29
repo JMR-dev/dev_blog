@@ -1,0 +1,8 @@
+# Example Cloudflare R2 backend configuration.
+# Copy to `backend.hcl` (gitignored) and fill in your values, then run:
+#   tofu init -backend-config=backend.hcl
+
+bucket     = "dev-blog-tfstate"
+endpoints  = { s3 = "https://<account-id>.r2.cloudflarestorage.com" }
+access_key = "<R2_ACCESS_KEY_ID>"
+secret_key = "<R2_SECRET_ACCESS_KEY>"
