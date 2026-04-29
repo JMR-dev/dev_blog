@@ -18,6 +18,14 @@ test-results/
 .env
 .env.production
 
+# certificates / keys (never commit)
+*.crt
+*.key
+*.pem
+*.pfx
+*.p12
+caddy-local-root.crt
+
 # macOS-specific files
 .DS_Store
 
