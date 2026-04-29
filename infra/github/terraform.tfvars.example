@@ -1,0 +1,11 @@
+repo_owner             = "JMR-dev"
+repo_name              = "dev_blog"
+default_branch         = "main"
+required_reviews       = 1
+require_signed_commits = false
+environments = [
+  "production",
+  "staging",
+  "preview",
+  "development",
+]
