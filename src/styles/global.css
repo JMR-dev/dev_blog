@@ -1,125 +1,295 @@
 /*
-  The CSS in this style tag is based off of Bear Blog's default CSS.
-  https://github.com/HermanMartinus/bearblog/blob/297026a877bc2ab2b3bdfbd6b9f7961c350917dd/templates/styles/blog/default.css
-  License MIT: https://github.com/HermanMartinus/bearblog/blob/master/LICENSE.md
- */
+  SecDev. theme — dark, security-focused.
+  Palette inspired by the React/Tailwind template:
+   - bg:        #0a0a0a
+   - panel:     #111
+   - border:    #1f2937 (gray-800)
+   - text:      #f3f4f6 (gray-100)
+   - muted:     #9ca3af (gray-400)
+   - dim:       #6b7280 (gray-500)
+   - accent:    #06b6d4 (cyan-500) / #22d3ee (cyan-400)
+   - secondary: #10b981 (emerald-500) / #34d399 (emerald-400)
+*/
 
 :root {
-	--accent: #2337ff;
-	--accent-dark: #000d8a;
-	--black: 15, 18, 25;
-	--gray: 96, 115, 159;
-	--gray-light: 229, 233, 240;
-	--gray-dark: 34, 41, 57;
-	--gray-gradient: rgba(var(--gray-light), 50%), #fff;
-	--box-shadow:
-		0 2px 6px rgba(var(--gray), 25%), 0 8px 24px rgba(var(--gray), 33%),
-		0 16px 32px rgba(var(--gray), 33%);
+	--bg: #0a0a0a;
+	--panel: #111111;
+	--panel-2: #0d0d0d;
+	--border: #1f2937;
+	--border-soft: #111827;
+	--text: #f3f4f6;
+	--text-strong: #ffffff;
+	--muted: #9ca3af;
+	--dim: #6b7280;
+	--dimmer: #4b5563;
+	--accent: #06b6d4;
+	--accent-bright: #22d3ee;
+	--emerald: #10b981;
+	--emerald-bright: #34d399;
+	--accent-glow: 0 0 15px rgba(6, 182, 212, 0.3);
+	--accent-glow-soft: 0 0 15px rgba(6, 182, 212, 0.1);
+	--font-sans:
+		var(--font-atkinson), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+		"Helvetica Neue", Arial, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+		"Courier New", monospace;
 }
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	background: var(--bg);
+	color-scheme: dark;
+}
+
 body {
-	font-family: var(--font-atkinson);
 	margin: 0;
 	padding: 0;
-	text-align: left;
-	background: linear-gradient(var(--gray-gradient)) no-repeat;
-	background-size: 100% 600px;
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	font-family: var(--font-sans);
+	font-size: 16px;
+	line-height: 1.6;
+	color: var(--text);
+	background: var(--bg);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 	word-wrap: break-word;
 	overflow-wrap: break-word;
-	color: rgb(var(--gray-dark));
-	font-size: 20px;
-	line-height: 1.7;
 }
+
+::selection {
+	background: rgba(6, 182, 212, 0.3);
+	color: #a5f3fc;
+}
+
 main {
-	width: 720px;
-	max-width: calc(100% - 2em);
-	margin: auto;
-	padding: 3em 1em;
+	flex: 1 1 auto;
+	width: 100%;
+	max-width: 56rem; /* matches max-w-4xl */
+	margin: 0 auto;
+	padding: 3rem 1.5rem;
 }
+
+@media (min-width: 1024px) {
+	main {
+		padding: 4rem 2rem;
+	}
+}
+
+a {
+	color: var(--accent-bright);
+	text-decoration: none;
+	transition: color 0.15s ease;
+}
+a:hover {
+	color: var(--accent);
+}
+
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-	margin: 0 0 0.5rem 0;
-	color: rgb(var(--black));
+	color: var(--text-strong);
+	margin: 0 0 0.75rem 0;
 	line-height: 1.2;
-}
-h1 {
-	font-size: 3.052em;
-}
-h2 {
-	font-size: 2.441em;
-}
-h3 {
-	font-size: 1.953em;
-}
-h4 {
-	font-size: 1.563em;
-}
-h5 {
-	font-size: 1.25em;
-}
-strong,
-b {
+	letter-spacing: -0.01em;
 	font-weight: 700;
 }
-a {
-	color: var(--accent);
+h1 {
+	font-size: 2.25rem;
 }
-a:hover {
-	color: var(--accent);
+h2 {
+	font-size: 1.5rem;
 }
+h3 {
+	font-size: 1.25rem;
+}
+h4 {
+	font-size: 1.125rem;
+}
+
 p {
-	margin-bottom: 1em;
+	margin: 0 0 1em 0;
 }
-.prose p {
-	margin-bottom: 2em;
+
+strong,
+b {
+	color: var(--text-strong);
+	font-weight: 700;
 }
-textarea {
-	width: 100%;
-	font-size: 16px;
-}
-input {
-	font-size: 16px;
-}
-table {
-	width: 100%;
-}
+
 img {
 	max-width: 100%;
 	height: auto;
-	border-radius: 8px;
+	border-radius: 4px;
 }
+
+hr {
+	border: none;
+	border-top: 1px solid var(--border);
+	margin: 2rem 0;
+}
+
 code {
-	padding: 2px 5px;
-	background-color: rgb(var(--gray-light));
-	border-radius: 2px;
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+	padding: 0.15em 0.4em;
+	background: #0f1720;
+	color: #a5f3fc;
+	border-radius: 3px;
+	border: 1px solid var(--border);
 }
+
 pre {
-	padding: 1.5em;
-	border-radius: 8px;
+	font-family: var(--font-mono);
+	padding: 1.25em;
+	border-radius: 4px;
+	overflow-x: auto;
+	background: #0f1720 !important;
+	border: 1px solid var(--border);
 }
 pre > code {
 	all: unset;
+	font-family: var(--font-mono);
 }
+
 blockquote {
-	border-left: 4px solid var(--accent);
-	padding: 0 0 0 20px;
+	border-left: 3px solid var(--accent);
+	padding: 0.25em 0 0.25em 1em;
+	margin: 1.25em 0;
+	color: var(--muted);
+	background: rgba(6, 182, 212, 0.04);
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 1em 0;
+}
+th,
+td {
+	border-bottom: 1px solid var(--border);
+	padding: 0.5em 0.75em;
+	text-align: left;
+}
+
+textarea,
+input {
+	font-family: inherit;
+	font-size: 1rem;
+}
+
+/* ---------- Reusable utility / component classes ---------- */
+
+.container {
+	width: 100%;
+	max-width: 56rem;
+	margin: 0 auto;
+	padding: 0 1.5rem;
+}
+@media (min-width: 1024px) {
+	.container {
+		padding: 0 2rem;
+	}
+}
+
+.btn-primary {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	background: var(--accent);
+	color: #030712;
+	padding: 0.625rem 1.25rem;
+	border-radius: 2px;
+	font-size: 0.875rem;
+	font-weight: 700;
+	box-shadow: var(--accent-glow);
+	transition: background 0.15s ease;
+	text-decoration: none;
+}
+.btn-primary:hover {
+	background: var(--accent-bright);
+	color: #030712;
+}
+
+.section-heading {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 1rem;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 1rem;
+	margin-bottom: 2rem;
+}
+.section-heading h2 {
 	margin: 0;
-	font-size: 1.333em;
+	font-size: 1.5rem;
+	color: var(--text-strong);
+	letter-spacing: -0.01em;
 }
-hr {
-	border: none;
-	border-top: 1px solid rgb(var(--gray-light));
+.section-heading .view-all {
+	font-size: 0.875rem;
+	color: var(--accent);
+	display: inline-flex;
+	align-items: center;
+	gap: 0.125rem;
+	font-weight: 500;
 }
-@media (max-width: 720px) {
-	body {
-		font-size: 18px;
-	}
-	main {
-		padding: 1em;
-	}
+.section-heading .view-all:hover {
+	color: var(--accent-bright);
+}
+
+.tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	background: rgba(16, 185, 129, 0.1);
+	color: var(--emerald-bright);
+	border: 1px solid rgba(16, 185, 129, 0.2);
+	padding: 0.2rem 0.5rem;
+	border-radius: 3px;
+	font-size: 0.75rem;
+	font-weight: 500;
+	font-family: var(--font-mono);
+}
+
+.tag svg {
+	color: rgba(16, 185, 129, 0.7);
+}
+
+.badge-online {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.25rem 0.75rem;
+	border-radius: 9999px;
+	background: rgba(16, 185, 129, 0.1);
+	color: var(--emerald-bright);
+	border: 1px solid rgba(16, 185, 129, 0.2);
+	font-size: 0.875rem;
+	font-weight: 500;
+	font-family: var(--font-mono);
+}
+
+.muted {
+	color: var(--muted);
+}
+.dim {
+	color: var(--dim);
+}
+
+.icon {
+	display: inline-block;
+	vertical-align: middle;
+	flex-shrink: 0;
 }
 
 .sr-only {
@@ -130,12 +300,32 @@ hr {
 	height: 1px;
 	width: 1px;
 	overflow: hidden;
-	/* IE6, IE7 - a 0 height clip, off to the bottom right of the visible 1px box */
-	clip: rect(1px 1px 1px 1px);
-	/* maybe deprecated but we need to support legacy browsers */
 	clip: rect(1px, 1px, 1px, 1px);
-	/* modern browsers, clip-path works inwards from each corner */
 	clip-path: inset(50%);
-	/* added line to stop words getting smushed together (as they go onto separate lines and some screen readers do not understand line feeds as a space */
 	white-space: nowrap;
+}
+
+/* ---------- Animations ---------- */
+@keyframes fade-in-up {
+	from {
+		opacity: 0;
+		transform: translateY(0.5rem);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+.animate-in {
+	animation: fade-in-up 0.7s ease-out both;
+}
+
+/* ---------- Responsive type ---------- */
+@media (max-width: 640px) {
+	h1 {
+		font-size: 1.875rem;
+	}
+	main {
+		padding: 2rem 1rem;
+	}
 }

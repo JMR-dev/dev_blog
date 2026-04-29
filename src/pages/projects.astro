@@ -1,0 +1,120 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import Icon from '../components/Icon.astro';
+import { PROJECTS, SITE_TITLE } from '../consts';
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+<BaseHead
+title={`Projects · ${SITE_TITLE}`}
+description="Open source projects, tools, and experiments."
+/>
+</head>
+<body>
+<Header />
+<main class="projects-page animate-in">
+<header class="page-header">
+<h1>Open Source</h1>
+<p class="lede">
+A small collection of tools and experiments — most live on
+<a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>.
+</p>
+</header>
+<div class="project-grid">
+{
+PROJECTS.map((p) => (
+<a href={p.url} target="_blank" rel="noopener noreferrer" class="project-card">
+<div class="project-card-head">
+<h3>{p.name}</h3>
+<Icon name="arrow-right" size={16} class="project-arrow" />
+</div>
+<p>{p.description}</p>
+</a>
+))
+}
+</div>
+</main>
+<Footer />
+</body>
+</html>
+
+<style>
+.projects-page {
+display: flex;
+flex-direction: column;
+gap: 2.5rem;
+}
+.page-header {
+border-bottom: 1px solid var(--border);
+padding-bottom: 1.5rem;
+}
+.page-header h1 {
+font-size: 2.25rem;
+font-weight: 800;
+letter-spacing: -0.02em;
+margin: 0 0 0.5rem;
+}
+.page-header .lede {
+color: var(--muted);
+font-size: 1.0625rem;
+margin: 0;
+}
+.project-grid {
+display: grid;
+grid-template-columns: 1fr;
+gap: 1.5rem;
+}
+@media (min-width: 640px) {
+.project-grid {
+grid-template-columns: 1fr 1fr;
+}
+}
+.project-card {
+display: flex;
+flex-direction: column;
+padding: 1.25rem;
+background: var(--panel);
+border: 1px solid var(--border);
+border-radius: 4px;
+color: inherit;
+transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.project-card:hover {
+border-color: rgba(6, 182, 212, 0.5);
+box-shadow: var(--accent-glow-soft);
+}
+.project-card-head {
+display: flex;
+align-items: center;
+justify-content: space-between;
+margin-bottom: 0.5rem;
+}
+.project-card h3 {
+margin: 0;
+font-size: 1.125rem;
+color: var(--text);
+font-weight: 600;
+transition: color 0.15s ease;
+}
+.project-card:hover h3 {
+color: var(--accent-bright);
+}
+.project-arrow {
+color: var(--dimmer);
+transition: color 0.15s ease, transform 0.2s ease;
+}
+.project-card:hover .project-arrow {
+color: var(--accent-bright);
+transform: rotate(-45deg);
+}
+.project-card p {
+margin: 0;
+font-size: 0.875rem;
+color: var(--muted);
+line-height: 1.6;
+}
+</style>

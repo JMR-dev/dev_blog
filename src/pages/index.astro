@@ -1,49 +1,207 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
-import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import Icon from '../components/Icon.astro';
+import PostCard from '../components/PostCard.astro';
+import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS } from '../consts';
+
+const latestPosts = (await getCollection('blog'))
+.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+.slice(0, 3);
 ---
 
 <!doctype html>
 <html lang="en">
-	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-	</head>
-	<body>
-		<Header />
-		<main>
-			<h1>🧑‍🚀 Hello, Astronaut!</h1>
-			<p>
-				Welcome to the official <a href="https://astro.build/">Astro</a> blog starter template. This template
-				serves as a lightweight, minimally-styled starting point for anyone looking to build a personal
-				website, blog, or portfolio with Astro.
-			</p>
-			<p>
-				This template comes with a few integrations already configured in your
-				<code>astro.config.mjs</code> file. You can customize your setup with
-				<a href="https://astro.build/integrations">Astro Integrations</a> to add tools like Tailwind,
-				React, or Vue to your project.
-			</p>
-			<p>Here are a few ideas on how to get started with the template:</p>
-			<ul>
-				<li>Edit this page in <code>src/pages/index.astro</code></li>
-				<li>Edit the site header items in <code>src/components/Header.astro</code></li>
-				<li>Add your name to the footer in <code>src/components/Footer.astro</code></li>
-				<li>Check out the included blog posts in <code>src/content/blog/</code></li>
-				<li>Customize the blog post page layout in <code>src/layouts/BlogPost.astro</code></li>
-			</ul>
-			<p>
-				Have fun! If you get stuck, remember to
-				<a href="https://docs.astro.build/">read the docs</a>
-				or <a href="https://astro.build/chat">join us on Discord</a> to ask questions.
-			</p>
-			<p>
-				Looking for a blog template with a bit more personality? Check out
-				<a href="https://github.com/Charca/astro-blog-template">astro-blog-template</a>
-				by <a href="https://twitter.com/Charca">Maxi Ferreira</a>.
-			</p>
-		</main>
-		<Footer />
-	</body>
+<head>
+<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+</head>
+<body>
+<Header />
+<main class="home animate-in">
+<!-- Hero -->
+<section class="hero">
+<div class="badge-online">
+<Icon name="terminal" size={14} />
+<span>System Online</span>
+</div>
+<h1 class="hero-title">
+Securing the web,<br />
+<span class="accent">one layer at a time.</span>
+</h1>
+<p class="hero-lede">
+Hi, I'm a security-focused full-stack web developer. I write about application
+security, high-performance backend systems, and building resilient interfaces.
+</p>
+<div class="hero-actions">
+<a href="/about" class="btn-primary">
+Read my manifesto
+<Icon name="arrow-right" size={16} />
+</a>
+</div>
+</section>
+
+<!-- Latest Articles -->
+<section class="latest">
+<div class="section-heading">
+<h2>Latest Articles</h2>
+<a href="/blog" class="view-all">
+View all <Icon name="chevron-right" size={14} />
+</a>
+</div>
+<div class="post-list">
+{
+latestPosts.map((post) => (
+<PostCard
+href={`/blog/${post.id}/`}
+title={post.data.title}
+date={post.data.pubDate}
+readTime={post.data.readTime}
+excerpt={post.data.description}
+tags={post.data.tags}
+/>
+))
+}
+</div>
+</section>
+
+<!-- Open Source -->
+<section class="projects">
+<div class="section-heading">
+<h2>Open Source</h2>
+</div>
+<div class="project-grid">
+{
+PROJECTS.map((p) => (
+<a href={p.url} target="_blank" rel="noopener noreferrer" class="project-card">
+<div class="project-card-head">
+<h3>{p.name}</h3>
+<Icon name="arrow-right" size={16} class="project-arrow" />
+</div>
+<p>{p.description}</p>
+</a>
+))
+}
+</div>
+</section>
+</main>
+<Footer />
+</body>
 </html>
+
+<style>
+.home {
+display: flex;
+flex-direction: column;
+gap: 4rem;
+}
+@media (min-width: 768px) {
+.home {
+gap: 6rem;
+}
+}
+
+.hero {
+	align-items: flex-start;
+display: flex;
+flex-direction: column;
+gap: 1.5rem;
+max-width: 42rem;
+padding-top: 1rem;
+}
+@media (min-width: 768px) {
+.hero {
+	align-items: flex-start;
+padding-top: 2.5rem;
+}
+}
+.hero-title {
+font-size: 2.25rem;
+line-height: 1.1;
+margin: 0;
+font-weight: 800;
+letter-spacing: -0.02em;
+color: var(--text-strong);
+}
+@media (min-width: 640px) {
+.hero-title {
+font-size: 3rem;
+}
+}
+.hero-title .accent {
+color: var(--accent-bright);
+}
+.hero-lede {
+font-size: 1.25rem;
+color: var(--muted);
+line-height: 1.6;
+font-weight: 300;
+margin: 0;
+}
+.hero-actions {
+padding-top: 0.5rem;
+}
+
+.post-list {
+display: grid;
+grid-template-columns: 1fr;
+gap: 3rem;
+}
+
+.project-grid {
+display: grid;
+grid-template-columns: 1fr;
+gap: 1.5rem;
+}
+@media (min-width: 640px) {
+.project-grid {
+grid-template-columns: 1fr 1fr;
+}
+}
+.project-card {
+display: flex;
+flex-direction: column;
+padding: 1.25rem;
+background: var(--panel);
+border: 1px solid var(--border);
+border-radius: 4px;
+color: inherit;
+transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.project-card:hover {
+border-color: rgba(6, 182, 212, 0.5);
+box-shadow: var(--accent-glow-soft);
+color: inherit;
+}
+.project-card-head {
+display: flex;
+align-items: center;
+justify-content: space-between;
+margin-bottom: 0.5rem;
+}
+.project-card h3 {
+margin: 0;
+font-size: 1.125rem;
+color: var(--text);
+font-weight: 600;
+transition: color 0.15s ease;
+}
+.project-card:hover h3 {
+color: var(--accent-bright);
+}
+.project-arrow {
+color: var(--dimmer);
+transition: color 0.15s ease, transform 0.2s ease;
+}
+.project-card:hover .project-arrow {
+color: var(--accent-bright);
+transform: rotate(-45deg);
+}
+.project-card p {
+margin: 0;
+font-size: 0.875rem;
+color: var(--muted);
+line-height: 1.6;
+}
+</style>
