@@ -17,21 +17,10 @@ name: deploy
 
 on:
   workflow_dispatch:
-    inputs:
-      action:
-        description: "Pipeline action"
-        required: true
-        default: deploy
-        type: choice
-        options: [plan, deploy, destroy]
-  push:
-    branches: [main]
-  pull_request:
 
 permissions:
   contents: read
   packages: write
-  pull-requests: write
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -98,6 +87,7 @@ jobs:
   infra:
     name: OpenTofu (Vultr / R2)
     runs-on: ubuntu-latest
+    environment: production
     defaults:
       run:
         working-directory: infra
@@ -128,25 +118,11 @@ jobs:
       - name: tofu validate
         run: tofu validate
 
-      - name: tofu plan
-        if: github.event_name == 'pull_request' || inputs.action == 'plan'
-        run: tofu plan -input=false -no-color
-
       - name: tofu apply
-        if: >-
-          github.event_name == 'push' ||
-          (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
         run: tofu apply -input=false -auto-approve
-
-      - name: tofu destroy
-        if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
-        run: tofu destroy -input=false -auto-approve
 
       - name: Export instance IP
         id: outputs
-        if: >-
-          github.event_name == 'push' ||
-          (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
         run: echo "instance_ip=$(tofu output -raw main_ip)" >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------
@@ -165,9 +141,6 @@ jobs:
   push-app:
     name: Push app → GHCR
     needs: gate
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -189,9 +162,6 @@ jobs:
   push-caddy:
     name: Push caddy → GHCR
     needs: gate
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -216,10 +186,8 @@ jobs:
   deploy:
     name: Ansible deploy
     needs: [push-app, push-caddy, infra]
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
     runs-on: ubuntu-latest
+    environment: production
     defaults:
       run:
         working-directory: ansible
