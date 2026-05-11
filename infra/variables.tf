@@ -1,47 +1,29 @@
-variable "vultr_api_key" {
-  description = "Vultr API key. Provide via TF_VAR_vultr_api_key env var."
+variable "gcp_project_id" {
   type        = string
-  sensitive   = true
+  description = "The GCP Project ID"
+  default     = "dev-blog-494815"
 }
 
-variable "region" {
-  description = "Vultr region code."
+variable "gcp_region" {
   type        = string
-  default     = "sea" # Seattle, WA
+  description = "GCP region"
+  default     = "us-central1"
 }
 
-variable "plan" {
-  description = "Vultr instance plan."
+variable "gcp_zone" {
   type        = string
-  default     = "vc2-1c-2gb"
-}
-
-variable "os_name_filter" {
-  description = "Substring to match an OS name in the Vultr OS catalog."
-  type        = string
-  default     = "AlmaLinux 10"
+  description = "GCP zone"
+  default     = "us-central1-a"
 }
 
 variable "hostname" {
-  description = "Hostname / label for the instance."
   type        = string
+  description = "The hostname for the instance"
   default     = "dev-blog"
 }
 
-variable "ssh_key_ids" {
-  description = "List of pre-existing Vultr SSH key IDs to inject."
-  type        = list(string)
-  default     = []
-}
-
-variable "backup_hour_utc" {
-  description = "Hour of day (UTC, 0-23) for the daily automated backup."
-  type        = number
-  default     = 8
-}
-
-variable "tags" {
-  description = "Tags to apply to the instance."
-  type        = list(string)
-  default     = ["dev_blog", "managed-by=opentofu"]
+variable "domain" {
+  type        = string
+  description = "The primary domain name"
+  default     = "jasonmross.dev"
 }

@@ -37,3 +37,4 @@ RUN set -eux; \
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 COPY Caddyfile      /etc/caddy/Caddyfile
 COPY coraza.conf    /etc/caddy/coraza/local.conf
+COPY maintenance.html /etc/caddy/maintenance/maintenance.html

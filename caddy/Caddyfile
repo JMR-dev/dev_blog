@@ -5,7 +5,8 @@
 
 {
 	# Make sure the WAF runs before the reverse-proxy handler.
-	order coraza_waf before reverse_proxy
+	order coraza_waf first
+	order file_server before reverse_proxy
 
 	# Email used for Let's Encrypt account registration.
 	email {$ACME_EMAIL:admin@example.com}
@@ -44,6 +45,20 @@
 			gcp_project {$GCP_PROJECT}
 		}
 		resolvers 8.8.8.8 1.1.1.1
+	}
+
+	# ------------------------------------------------------------------
+	# Maintenance Page Handling
+	# ------------------------------------------------------------------
+	handle_errors {
+		@502_503 {
+			expression {err.status} in [502, 503]
+		}
+		handle @502_503 {
+			root * /etc/caddy/maintenance
+			rewrite * /maintenance.html
+			file_server
+		}
 	}
 
 	# ------------------------------------------------------------------

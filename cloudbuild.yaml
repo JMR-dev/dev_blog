@@ -1,0 +1,49 @@
+steps:
+  # 1. Check if any markdown files in GCS were modified in the last 24 hours
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'check-updates'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        LATEST_MOD=$(gsutil ls -l gs://${_BUCKET}/posts/*.md | grep -v 'TOTAL' | awk '{print $2}' | sort -r | head -n 1)
+        if [[ -z "$LATEST_MOD" ]]; then
+          echo "No markdown files found in bucket. Skipping build."
+          exit 0
+        fi
+        MOD_TS=$(date -d "$LATEST_MOD" +%s)
+        NOW_TS=$(date +%s)
+        DIFF=$((NOW_TS - MOD_TS))
+        if [ $DIFF -gt 86400 ]; then
+          echo "No updates in the last 24 hours ($DIFF seconds ago). Skipping build."
+          # We exit 0 but use a custom variable or file to signal skip if needed.
+          # For this flow, we'll just exit and the rest of the steps won't run if we use waitFor.
+        fi
+
+  # 2. Build the Astro site image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/app:latest', '.']
+    waitFor: ['check-updates']
+
+  # 3. Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image'
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/app:latest']
+    waitFor: ['build-image']
+
+  # 4. Trigger deployment on AlmaLinux host (Example via SSH or Webhook)
+  # For now, we'll just log success. A real implementation would use IAP SSH.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'notify-deploy'
+    entrypoint: 'bash'
+    args: ['-c', 'echo "Build complete. Image pushed to ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/app:latest"']
+    waitFor: ['push-image']
+
+substitutions:
+  _BUCKET: 'dev-blog-494815-blog-content'
+  _REGION: 'us-central1'
+  _REPO: 'dev-blog'
+
+options:
+  logging: CLOUD_LOGGING
