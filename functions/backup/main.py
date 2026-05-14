@@ -1,28 +1,68 @@
 import os
 import subprocess
 import tempfile
+import logging
 import functions_framework
+from opentelemetry import _logs
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.sdk.resources import Resource
+
+# ---------------------------------------------------------------------------
+# OTEL Logging Setup
+# ---------------------------------------------------------------------------
+resource = Resource.create({
+    "service.name": "dev-blog-backup",
+    "deployment.environment": os.environ.get("ENVIRONMENT", "production")
+})
+logger_provider = LoggerProvider(resource=resource)
+_logs.set_logger_provider(logger_provider)
+
+# Export logs via OTLP (async/non-blocking via BatchLogRecordProcessor)
+exporter = OTLPLogExporter()
+logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+
+# Attach OTEL handler to the root logger
+otel_handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
+root_logger = logging.getLogger()
+root_logger.addHandler(otel_handler)
+
+# Create a logger for this module
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Disable the default stream handler for GCP to minimize billable logs
+# By setting the root logger to WARNING, we ensure that standard output
+# (captured by GCP) only contains high-priority logs.
+# We also want to make sure we don't duplicate logs.
+for handler in root_logger.handlers:
+    if not isinstance(handler, LoggingHandler):
+        handler.setLevel(logging.WARNING)
+
+root_logger.setLevel(logging.WARNING)
 
 @functions_framework.cloud_event
 def run_backup(cloud_event):
-    print(f"Triggered by event: {cloud_event['id']}")
+    logger.info(f"Triggered by event: {cloud_event['id']}")
     
     # Restic environments are expected to be set via Secret Manager / Env vars
-    # Required: RESTIC_REPOSITORY, RESTIC_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+    source_bucket = os.environ.get('SOURCE_BUCKET')
+    r2_account_id = os.environ.get('R2_ACCOUNT_ID')
+    r2_bucket = os.environ.get('R2_BUCKET')
     
-    source_bucket = os.environ.get('SOURCE_BUCKET') # e.g. gs://my-bucket
+    # Construct the Restic repository URL for Cloudflare R2
+    os.environ['RESTIC_REPOSITORY'] = f"s3:https://{r2_account_id}.r2.cloudflarestorage.com/{r2_bucket}"
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        # 1. Sync bucket to local temp dir (restic works best on local files for GCS source)
-        # Alternatively, restic can use rclone as a backend, but for a small blog, 
-        # syncing to a temp dir is simpler.
-        print(f"Syncing {source_bucket} to {tmpdir}...")
-        subprocess.run(['gsutil', '-m', 'rsync', '-r', source_bucket, tmpdir], check=True)
+        logger.info(f"Syncing {source_bucket} to {tmpdir}...")
+        try:
+            subprocess.run(['gsutil', '-m', 'rsync', '-r', source_bucket, tmpdir], check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Sync failed: {e.stderr}")
+            raise e
         
-        # 2. Run restic backup
-        print("Starting restic backup to R2...")
-        # Note: In a real environment, you'd ensure the restic binary is in the path.
-        # We'll use a wrapper or ensure it's in the container.
+        logger.info("Starting restic backup to R2...")
         try:
             result = subprocess.run(
                 ['restic', 'backup', tmpdir, '--tag', 'gcs-trigger'],
@@ -30,9 +70,11 @@ def run_backup(cloud_event):
                 text=True,
                 check=True
             )
-            print(result.stdout)
+            logger.info(result.stdout)
         except subprocess.CalledProcessError as e:
-            print(f"Restic failed: {e.stderr}")
+            logger.error(f"Restic failed: {e.stderr}")
             raise e
 
-    print("Backup completed successfully.")
+    logger.info("Backup completed successfully.")
+    # Ensure logs are flushed before the function exits
+    logger_provider.force_flush()

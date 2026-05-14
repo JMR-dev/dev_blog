@@ -37,6 +37,7 @@ COPY --from=build --chown=astro:astro /app/package.json    ./package.json
 COPY --from=build --chown=astro:astro /app/node_modules    ./node_modules
 COPY --from=build --chown=astro:astro /app/dist            ./dist
 COPY --from=build --chown=astro:astro /app/astro.config.mjs ./astro.config.mjs
+COPY --from=build --chown=astro:astro /app/otel.js          ./otel.js
 
 USER astro
 
@@ -47,4 +48,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 
 # Invoke astro directly via node to avoid corepack/pnpm shims at runtime
 # (the rootfs is read-only and corepack would try to write a cache dir).
-CMD ["node", "./node_modules/astro/bin/astro.mjs", "preview", "--host", "0.0.0.0", "--port", "4321"]
+# Use --import to load the OTEL instrumentation in ESM mode.
+CMD ["node", "--import", "./otel.js", "./node_modules/astro/bin/astro.mjs", "preview", "--host", "0.0.0.0", "--port", "4321"]

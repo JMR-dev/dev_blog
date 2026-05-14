@@ -16,6 +16,7 @@ Environment=NODE_ENV=production
 Environment=HOST=0.0.0.0
 Environment=PORT=4321
 Environment=ASTRO_TELEMETRY_DISABLED=1
+Environment=DISABLE_GCP_LOGGING=true
 
 # Hardening
 NoNewPrivileges=true

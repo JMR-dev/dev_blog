@@ -1,5 +1,5 @@
 # Use a custom Dockerfile to include restic and gsutil
-FROM python:3.11-slim
+FROM python:3.14-slim-trixie
 
 # Install restic and curl (to get cloud-sdk)
 RUN apt-get update && apt-get install -y restic curl gnupg \
@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y restic curl gnupg \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+RUN pip install --upgrade pip
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

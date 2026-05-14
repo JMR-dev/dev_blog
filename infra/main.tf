@@ -212,32 +212,46 @@ resource "google_cloud_scheduler_job" "daily_trigger" {
 }
 
 # ---------------------------------------------------------------------------
-# Secret Manager for Backup Credentials
+# Secret Manager for Backup & DNS Credentials
 # ---------------------------------------------------------------------------
 
 resource "google_secret_manager_secret" "restic_password" {
-  secret_id = "restic-password"
+  secret_id = "RESTIC_PASSWORD"
   replication {
     auto {}
   }
 }
 
 resource "google_secret_manager_secret" "r2_access_key" {
-  secret_id = "r2-access-key-id"
+  secret_id = "R2_ACCESS_KEY_ID"
   replication {
     auto {}
   }
 }
 
 resource "google_secret_manager_secret" "r2_secret_key" {
-  secret_id = "r2-secret-access-key"
+  secret_id = "R2_SECRET_ACCESS_KEY"
   replication {
     auto {}
   }
 }
 
-resource "google_secret_manager_secret" "restic_repo" {
-  secret_id = "restic-repository"
+resource "google_secret_manager_secret" "r2_account_id" {
+  secret_id = "R2_ACCOUNT_ID"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret" "r2_backup_bucket" {
+  secret_id = "R2_BACKUP_BUCKET_NAME"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret" "gcp_dns_sa" {
+  secret_id = "gcp-dns-sa"
   replication {
     auto {}
   }
@@ -305,9 +319,16 @@ resource "google_cloudfunctions2_function" "backup" {
     }
 
     secret_environment_variables {
-      key        = "RESTIC_REPOSITORY"
+      key        = "R2_ACCOUNT_ID"
       project_id = var.gcp_project_id
-      secret     = google_secret_manager_secret.restic_repo.secret_id
+      secret     = google_secret_manager_secret.r2_account_id.secret_id
+      version    = "latest"
+    }
+
+    secret_environment_variables {
+      key        = "R2_BUCKET"
+      project_id = var.gcp_project_id
+      secret     = google_secret_manager_secret.r2_backup_bucket.secret_id
       version    = "latest"
     }
   }
@@ -339,7 +360,8 @@ resource "google_secret_manager_secret_iam_member" "backup_secrets" {
     google_secret_manager_secret.restic_password.id,
     google_secret_manager_secret.r2_access_key.id,
     google_secret_manager_secret.r2_secret_key.id,
-    google_secret_manager_secret.restic_repo.id
+    google_secret_manager_secret.r2_account_id.id,
+    google_secret_manager_secret.r2_backup_bucket.id
   ])
   secret_id = each.key
   role      = "roles/secretmanager.secretAccessor"
