@@ -6,13 +6,17 @@ name: pipeline
 #
 #   changes ─┬─ build ─┐
 #            ├─ unit  ─┤
-#            ├─ e2e   ─┼─ preview            (pull requests)
-#            └─ infra-check ─┘
+#            ├─ e2e   ─┼─ preview                    (pull requests)
+#            └─ infra-check
 #                      └─ infra ─ images ─ rollout   (main only)
 #
 # On main every job runs, and each one SKIPS ITS STEPS when its part of the
 # tree did not change, instead of being skipped at job level: a skipped job
 # would cascade-skip everything that `needs:` it.
+#
+# Every job has a timeout-minutes. The runner fleet is one pod running one job
+# at a time (gitea stack: runnerReplicas/runnerCapacity), so a job that hangs
+# would otherwise hold the only slot for the runner's 3h default.
 #
 # Runs on the GKE runners (gitea-496920/gitea-runners). Jobs there have no
 # Google Cloud identity of their own; the deploy jobs authenticate with the
@@ -46,6 +50,7 @@ env:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       app: ${{ steps.diff.outputs.app }}
       caddy: ${{ steps.diff.outputs.caddy }}
@@ -92,6 +97,7 @@ jobs:
   build:
     needs: changes
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -107,6 +113,7 @@ jobs:
   unit:
     needs: changes
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -119,20 +126,29 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  # One job for all five Playwright projects, inside the Playwright image that
+  # matches the locked @playwright/test version: the browsers and their system
+  # libraries are already there, so nothing is downloaded at job time (a
+  # stalled browser download once hung this job for half an hour), and the
+  # single runner slot pays for one checkout and install instead of five.
+  # Bump the tag together with @playwright/test.
   e2e:
     needs: changes
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        project: [chromium, firefox, webkit, mobile-chrome, mobile-safari]
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
     env:
       # The weekly rebuild changes base images, not the site; build + unit
-      # still run, the browser matrix does not.
+      # still run, the browser tests do not.
       RUN: ${{ needs.changes.outputs.app == 'true' && github.event_name != 'schedule' }}
     steps:
       - if: env.RUN != 'true'
-        run: echo "site unchanged -- skipping ${{ matrix.project }}"
+        run: echo "site unchanged -- skipping browser tests"
+      # The image has node but not git; without git, actions/checkout falls
+      # back to a GitHub-only tarball API.
+      - if: env.RUN == 'true'
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates
       - if: env.RUN == 'true'
         uses: actions/checkout@v4
       - if: env.RUN == 'true'
@@ -140,34 +156,20 @@ jobs:
         with:
           run_install: false
       - if: env.RUN == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: package.json
-          cache: pnpm
-      - if: env.RUN == 'true'
         run: pnpm install --frozen-lockfile
       - if: env.RUN == 'true'
-        name: Install browser
-        run: |
-          # The mobile projects are device profiles on the desktop engines.
-          case "${{ matrix.project }}" in
-            mobile-chrome) browser=chromium ;;
-            mobile-safari) browser=webkit ;;
-            *)             browser="${{ matrix.project }}" ;;
-          esac
-          pnpm exec playwright install --with-deps "$browser"
-      - if: env.RUN == 'true'
-        run: pnpm test:e2e --project=${{ matrix.project }}
+        run: pnpm test:e2e
       - if: failure() && env.RUN == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.project }}
+          name: playwright-report
           path: playwright-report/
           retention-days: 7
 
   infra-check:
     needs: changes
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -189,6 +191,7 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: [build, unit, e2e, infra-check]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -220,6 +223,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: [changes, build, unit, e2e, infra-check]
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       RUN: ${{ needs.changes.outputs.infra }}
     steps:
@@ -279,6 +283,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: [changes, infra]
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       APP: ${{ needs.changes.outputs.app }}
       CADDY: ${{ needs.changes.outputs.caddy }}
@@ -329,6 +334,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: [changes, images]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       KICK: ${{ needs.changes.outputs.app == 'true' || needs.changes.outputs.caddy == 'true' }}
     steps:
