@@ -14,14 +14,24 @@ name: pipeline
 # tree did not change, instead of being skipped at job level: a skipped job
 # would cascade-skip everything that `needs:` it.
 #
-# Every job has a timeout-minutes. The runner fleet is one pod running one job
-# at a time (gitea stack: runnerReplicas/runnerCapacity), so a job that hangs
-# would otherwise hold the only slot for the runner's 3h default.
+# Every job has a timeout-minutes, so a job that hangs fails instead of holding
+# a runner slot for the runner's 3h default. The heavy ones allow for a heavy
+# node scaling up from zero first.
 #
-# Runs on the GKE runners (gitea-496920/gitea-runners). Jobs there have no
-# Google Cloud identity of their own; the deploy jobs authenticate with the
-# GCP_SA_KEY secret, a key for gitea-deploy@dev-blog-494815 (created by
-# scripts/bootstrap.sh), whose roles reach this one project only.
+# Runs on the GKE runners (gitea-496920/gitea-runners; see the gitea repo's
+# docs/runners.md). Three labels, picked per job:
+#
+#   ubuntu-latest  a job pod of its own, in parallel with the others
+#   heavy          a job pod alone on an e2-standard-4: compiling the Pulumi
+#                  program peaks around 7.5 GB (pulumi-gcp's compute package),
+#                  more than an ubuntu-latest pod's 3Gi limit
+#   docker         the Docker-in-Docker runner; job pods have no Docker daemon,
+#                  so `docker build` has to run here
+#
+# Jobs have no Google Cloud identity of their own; the deploy jobs
+# authenticate with the GCP_SA_KEY secret, a key for
+# gitea-deploy@dev-blog-494815 (created by scripts/bootstrap.sh), whose roles
+# reach this one project only.
 
 on:
   push:
@@ -168,8 +178,8 @@ jobs:
 
   infra-check:
     needs: changes
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: heavy
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -190,8 +200,8 @@ jobs:
   preview:
     if: github.event_name == 'pull_request'
     needs: [build, unit, e2e, infra-check]
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: heavy
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -222,8 +232,8 @@ jobs:
   infra:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: [changes, build, unit, e2e, infra-check]
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    runs-on: heavy
+    timeout-minutes: 60
     env:
       RUN: ${{ needs.changes.outputs.infra }}
     steps:
@@ -261,6 +271,12 @@ jobs:
           pulumi login "$PULUMI_BACKEND"
           pulumi stack select prod
           pulumi up --yes --diff --non-interactive
+      - if: env.RUN == 'true'
+        name: Install an SSH client for IAP
+        run: |
+          command -v ssh && exit 0
+          SUDO=""; [[ $(id -u) -ne 0 ]] && SUDO=sudo
+          $SUDO apt-get update -qq && $SUDO apt-get install -y -qq --no-install-recommends openssh-client
       # pulumi up uploads vm/ to the bucket; the VM only re-reads it on boot or
       # on a sync. On the very first deploy the VM is still bootstrapping (and
       # pulls the same files itself), so a sync that cannot connect yet is not
@@ -282,7 +298,7 @@ jobs:
   images:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: [changes, infra]
-    runs-on: ubuntu-latest
+    runs-on: docker
     timeout-minutes: 60
     env:
       APP: ${{ needs.changes.outputs.app }}
@@ -344,6 +360,12 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - if: env.KICK == 'true'
         uses: google-github-actions/setup-gcloud@v2
+      - if: env.KICK == 'true'
+        name: Install an SSH client for IAP
+        run: |
+          command -v ssh && exit 0
+          SUDO=""; [[ $(id -u) -ne 0 ]] && SUDO=sudo
+          $SUDO apt-get update -qq && $SUDO apt-get install -y -qq --no-install-recommends openssh-client
       # The quadlets track :prod with AutoUpdate=registry, so the VM's own
       # auto-update timer would pick the new images up eventually; this makes
       # it immediate. A failed start rolls back by itself (Notify=healthy).
