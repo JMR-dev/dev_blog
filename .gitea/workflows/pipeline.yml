@@ -66,6 +66,9 @@ jobs:
           case "$EVENT" in
             pull_request) base="$PR_BASE" ;;
             push)         base="$PUSH_BEFORE" ;;
+            # The weekly run only rebuilds images on fresh base layers. An
+            # unattended `pulumi up` every Sunday is not what it is for.
+            schedule)     printf 'app=true\ncaddy=true\ninfra=false\n' >> "$GITHUB_OUTPUT"; echo "scheduled image rebuild"; exit 0 ;;
             *)            all "$EVENT"; exit 0 ;;
           esac
           # A new branch has an all-zero "before"; a force push can leave it
@@ -124,7 +127,9 @@ jobs:
       matrix:
         project: [chromium, firefox, webkit, mobile-chrome, mobile-safari]
     env:
-      RUN: ${{ needs.changes.outputs.app }}
+      # The weekly rebuild changes base images, not the site; build + unit
+      # still run, the browser matrix does not.
+      RUN: ${{ needs.changes.outputs.app == 'true' && github.event_name != 'schedule' }}
     steps:
       - if: env.RUN != 'true'
         run: echo "site unchanged -- skipping ${{ matrix.project }}"
