@@ -1,0 +1,9 @@
+name: blog
+runtime:
+  name: go
+  options:
+    # Pulumi runs this prebuilt binary instead of compiling the program itself.
+    # `make check` (and the infra pipeline) build it first; without it,
+    # preview/up fail outright.
+    binary: ./blog-infra
+description: blog on a GCE VM running podman quadlets, fronted by Caddy with ACME DNS-01 and the Coraza WAF.

@@ -1,0 +1,12 @@
+[Unit]
+Description=blog dump to Cloud Storage
+After=blog.service
+Requires=blog.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/blog-backup
+# A dump of a large instance is not fast, and it should never be killed halfway.
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle

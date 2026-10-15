@@ -1,7 +1,8 @@
 # Development Caddyfile – local HTTPS via `tls internal` (self-signed, no ACME).
-# Mounted into the Caddy container by compose.override.yaml, replacing the
-# production Caddyfile. Same WAF + reverse-proxy behaviour, just a simpler TLS
-# story so https://localhost:8443 works without any cloud credentials.
+# Mounted into the Caddy container by compose.yaml. Production renders
+# vm/config/Caddyfile.tmpl instead; this keeps the same WAF + reverse-proxy
+# shape with a simpler TLS story, so https://localhost:8443 works without any
+# cloud credentials.
 
 {
 	order coraza_waf before reverse_proxy
@@ -28,7 +29,7 @@
 		`
 	}
 
-	reverse_proxy app:4321 {
+	reverse_proxy app:8080 {
 		header_up X-Real-IP {remote_host}
 	}
 
