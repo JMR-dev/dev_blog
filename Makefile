@@ -35,11 +35,11 @@ dev: ## Build and run the site locally behind the WAF (podman compose)
 .PHONY: check
 check: ## Build, vet and test the Pulumi program; syntax-check and lint the shell scripts
 	cd infra && go build -o blog-infra . && go vet ./... && go test ./...
-	bash -n vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh
+	bash -n vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh
 	@# if/else, not `a && b || c`: the latter reports "not installed" and exits 0
 	@# when shellcheck runs and FINDS something, so CI would never fail on it.
 	@if command -v shellcheck >/dev/null; then \
-		shellcheck -S warning vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh; \
+		shellcheck -S warning vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh; \
 	else echo "shellcheck not installed -- skipped"; fi
 
 .PHONY: preview
@@ -51,9 +51,9 @@ up: check ## Apply the infrastructure (normally Gitea Actions does this on main)
 	cd infra && pulumi up
 
 .PHONY: rollout
-rollout: ## Pull the latest :prod images onto the VM right now
+rollout: ## Pull the latest :prod images onto the VM right now (see scripts/vm-rollout.sh)
 	gcloud compute ssh $(VM) --zone=$(ZONE) --tunnel-through-iap --project=$(PROJECT) \
-		--command 'sudo systemctl start podman-auto-update.service && sudo podman ps'
+		--command 'sudo bash -s' < scripts/vm-rollout.sh
 
 .PHONY: sync
 sync: ## Re-render VM config from the bucket and restart what changed

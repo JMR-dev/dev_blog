@@ -28,6 +28,10 @@ name: pipeline
 #   docker         the Docker-in-Docker runner; job pods have no Docker daemon,
 #                  so `docker build` has to run here
 #
+# Actions are pinned to a full commit SHA, with the release in a comment: a tag
+# can be moved, and these steps hold GCP_SA_KEY. Bump the SHA and the comment
+# together.
+#
 # Jobs have no Google Cloud identity of their own; the deploy jobs
 # authenticate with the GCP_SA_KEY secret, a key for
 # gitea-deploy@dev-blog-494815 (created by scripts/bootstrap.sh), whose roles
@@ -44,9 +48,13 @@ on:
   schedule:
     - cron: "0 4 * * 0"
 
+# On a PR a newer push supersedes the run in progress: nothing there deploys.
+# Anywhere else runs queue instead -- cancelling a `pulumi up` part-way leaves
+# pending operations in the state, and two deploys interleaving could push an
+# older image to :prod after a newer one.
 concurrency:
   group: pipeline-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   GCP_PROJECT: dev-blog-494815
@@ -62,11 +70,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      # What to DEPLOY: the site image, the edge image, the Pulumi stack.
       app: ${{ steps.diff.outputs.app }}
       caddy: ${{ steps.diff.outputs.caddy }}
       infra: ${{ steps.diff.outputs.infra }}
+      # What to TEST in a browser: the site, or the tests and CI themselves.
+      e2e: ${{ steps.diff.outputs.e2e }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - id: diff
@@ -77,13 +88,13 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          all() { printf 'app=true\ncaddy=true\ninfra=true\n' >> "$GITHUB_OUTPUT"; echo "all parts marked changed ($1)"; }
+          all() { printf 'app=true\ncaddy=true\ninfra=true\ne2e=true\n' >> "$GITHUB_OUTPUT"; echo "all parts marked changed ($1)"; }
           case "$EVENT" in
             pull_request) base="$PR_BASE" ;;
             push)         base="$PUSH_BEFORE" ;;
             # The weekly run only rebuilds images on fresh base layers. An
             # unattended `pulumi up` every Sunday is not what it is for.
-            schedule)     printf 'app=true\ncaddy=true\ninfra=false\n' >> "$GITHUB_OUTPUT"; echo "scheduled image rebuild"; exit 0 ;;
+            schedule)     printf 'app=true\ncaddy=true\ninfra=false\ne2e=false\n' >> "$GITHUB_OUTPUT"; echo "scheduled image rebuild"; exit 0 ;;
             *)            all "$EVENT"; exit 0 ;;
           esac
           # A new branch has an all-zero "before"; a force push can leave it
@@ -93,15 +104,22 @@ jobs:
           fi
           files=$(git diff --name-only "$base" "$SHA")
           printf '%s\n' "$files"
-          # A pipeline change runs everything, so new pipeline logic is
-          # exercised end to end on the push that introduces it.
-          if grep -q '^\.gitea/workflows/' <<<"$files"; then all "pipeline changed"; exit 0; fi
-          has() { grep -qE "$1" <<<"$files" && echo true || echo false; }
+          # Deploys key off SOURCE only. Test code (unit, e2e, Pulumi mock
+          # tests) and CI/tooling changes are tested on the way through but
+          # deploy nothing -- not even a change to this file.
+          src=$(grep -vE '^src/tests/|\.(test|spec)\.[cm]?[jt]s$|_test\.go$' <<<"$files" || true)
+          has() { grep -qE "$1" <<<"$2" && echo true || echo false; }
+          # image/caddy.version is in app and caddy: the site image serves with the same Caddy release.
+          app=$(has '^(src/|public/|package\.json$|pnpm-lock\.yaml$|astro\.config\.mjs$|tsconfig\.json$|image/app/|image/caddy\.version$)' "$src")
           {
-            # image/caddy.version is in both: the app image serves with the same Caddy release.
-            echo "app=$(has '^(src/|public/|package\.json$|pnpm-lock\.yaml$|astro\.config\.mjs$|tsconfig\.json$|image/app/|image/caddy\.version$)')"
-            echo "caddy=$(has '^(image/caddy/|image/caddy\.version$|image/coraza\.version$)')"
-            echo "infra=$(has '^(infra/|vm/)')"
+            echo "app=$app"
+            echo "caddy=$(has '^(image/caddy/|image/caddy\.version$|image/coraza\.version$)' "$src")"
+            # The Pulumi program and what it uploads: infra/ (stack config,
+            # secret-names.txt, go.mod) and the vm/ tree.
+            echo "infra=$(has '^(infra/|vm/)' "$src")"
+            # Browser tests run for site changes and for changes to the
+            # browser tests or the pipeline itself.
+            if [[ "$app" == true ]]; then echo "e2e=true"; else echo "e2e=$(has '^(e2e/|playwright\.config\.ts$|\.gitea/workflows/)' "$files")"; fi
           } | tee -a "$GITHUB_OUTPUT"
 
   build:
@@ -109,11 +127,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
           cache: pnpm
@@ -125,11 +143,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
           cache: pnpm
@@ -149,20 +167,20 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.59.1-noble
     env:
-      # The weekly rebuild changes base images, not the site; build + unit
-      # still run, the browser tests do not.
-      RUN: ${{ needs.changes.outputs.app == 'true' && github.event_name != 'schedule' }}
+      # Site, browser-test or pipeline changes. The weekly rebuild changes base
+      # images, not the site, so build + unit still run and these do not.
+      RUN: ${{ needs.changes.outputs.e2e }}
     steps:
       - if: env.RUN != 'true'
-        run: echo "site unchanged -- skipping browser tests"
+        run: echo "site, browser tests and pipeline unchanged -- skipping browser tests"
       # The image has node but not git; without git, actions/checkout falls
       # back to a GitHub-only tarball API.
       - if: env.RUN == 'true'
         run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates
       - if: env.RUN == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - if: env.RUN == 'true'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           run_install: false
       - if: env.RUN == 'true'
@@ -170,7 +188,7 @@ jobs:
       - if: env.RUN == 'true'
         run: pnpm test:e2e
       - if: failure() && env.RUN == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: playwright-report/
@@ -181,8 +199,8 @@ jobs:
     runs-on: heavy
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: infra/go.mod
           cache-dependency-path: infra/go.sum
@@ -203,15 +221,15 @@ jobs:
     runs-on: heavy
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: infra/go.mod
           cache-dependency-path: infra/go.sum
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - name: Install Pulumi ${{ env.PULUMI_VERSION }}
         run: |
           curl -fsSL https://get.pulumi.com | sh -s -- --version "$PULUMI_VERSION"
@@ -240,18 +258,18 @@ jobs:
       - if: env.RUN != 'true'
         run: echo "infra/ and vm/ unchanged -- skipping pulumi up"
       - if: env.RUN == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - if: env.RUN == 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: infra/go.mod
           cache-dependency-path: infra/go.sum
       - if: env.RUN == 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - if: env.RUN == 'true'
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - if: env.RUN == 'true'
         name: Install Pulumi ${{ env.PULUMI_VERSION }}
         run: |
@@ -308,9 +326,9 @@ jobs:
       - if: env.APP != 'true' && env.CADDY != 'true'
         run: echo "images unchanged -- nothing to build"
       - if: env.APP == 'true' || env.CADDY == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - if: env.APP == 'true' || env.CADDY == 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         id: auth
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
@@ -369,17 +387,19 @@ jobs:
       KICK: ${{ needs.changes.outputs.app == 'true' || needs.changes.outputs.caddy == 'true' }}
     steps:
       - if: env.KICK == 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - if: env.KICK == 'true'
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - if: env.KICK == 'true'
         name: Install an SSH client for IAP
         run: |
           command -v ssh && exit 0
           SUDO=""; [[ $(id -u) -ne 0 ]] && SUDO=sudo
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq --no-install-recommends openssh-client
+      - if: env.KICK == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The quadlets track :prod with AutoUpdate=registry, so the VM's own
       # auto-update timer would pick the new images up eventually; this makes
       # it immediate. A failed start rolls back by itself (Notify=healthy).
@@ -389,7 +409,7 @@ jobs:
           for i in $(seq 1 10); do
             if gcloud compute ssh "$VM" --zone="$GCP_ZONE" --project="$GCP_PROJECT" \
                  --tunnel-through-iap --quiet \
-                 --command 'sudo systemctl start podman-auto-update.service && sudo podman ps'; then
+                 --command 'sudo bash -s' < scripts/vm-rollout.sh; then
               exit 0
             fi
             echo "rollout attempt $i/10 failed; retrying in 30s"
