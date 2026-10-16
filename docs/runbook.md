@@ -7,25 +7,35 @@ The `make` targets that touch the VM use IAP; nothing needs a public SSH port.
 
 Push to `main` (via a PR). `.gitea/workflows/pipeline.yml` then:
 
-1. builds and unit-tests the site, runs Playwright when the site changed, and
-   runs `make check` (Pulumi program build/vet/invariant tests, shellcheck);
-2. if `infra/` or `vm/` changed: `pulumi up`, then a config sync on the VM;
-3. if the site or the Caddy pins changed: builds the images and pushes
-   `:prod` and `:<short-sha>` to Artifact Registry;
+1. builds and unit-tests the site and runs `make check` (Pulumi program
+   build/vet/invariant tests, shellcheck), on every push; runs Playwright when
+   the site, the browser tests or the pipeline changed;
+2. if the Pulumi source changed (`infra/`, `vm/`): `pulumi up`, then a config
+   sync on the VM;
+3. if the site or the Caddy pins changed: builds the images, smoke-tests the
+   site image as the quadlet runs it, and pushes `:prod` and `:<short-sha>` to
+   Artifact Registry;
 4. kicks `podman-auto-update` on the VM over IAP and waits up to 20 minutes
    for `https://blog.jasonmross.dev/` to answer.
 
+Deploys key off **source** only. Test code (`src/tests/`, `*.test.ts`,
+`e2e/`, `infra/*_test.go`), the pipeline itself, docs and tooling are tested
+on the way through and deploy nothing. To redeploy everything on purpose, run
+the pipeline by hand (`workflow_dispatch`).
+
 PRs stop after step 1 and add a `pulumi preview`. Read it before merging and
-look for `replace` on `blog-vm` (see below).
+look for `replace` on `blog-vm` (see below). Pushing again to a PR cancels its
+run in progress; on `main`, runs queue instead.
 
 | You changed | What applies it | Watch for |
 |---|---|---|
-| `src/`, `public/`, Astro config, `image/app/` | the pipeline: new site image | the health gate |
+| `src/` (not `src/tests/`), `public/`, Astro config, deps, `image/app/` | the pipeline: new site image | the image smoke test and the health gate |
 | `image/caddy/`, `image/*.version` | the pipeline: new images | the Dockerfile asserts both Caddy plugins |
 | `vm/**` (templates, quadlets, units, `bootstrap.sh`) | the pipeline: `pulumi up` + config sync | services restart only if a rendered file changed |
-| `infra/**` | the pipeline: `pulumi up` | any `replace` on the instance or the data disk |
+| `infra/**` (not `*_test.go`) | the pipeline: `pulumi up` | any `replace` on the instance or the data disk |
 | `vm/startup.sh`, boot disk, zone, subnet | `pulumi up` **replaces the VM** | ~15 min down and a new TLS certificate; see below |
 | `blog:wafMode` | the pipeline | the fail2ban WAF jail follows the mode |
+| tests, `.gitea/workflows/`, docs, `scripts/`, `Makefile` | nothing is deployed | — |
 | a secret value | `gcloud secrets versions add …`, then `make sync` | — |
 
 ## Everyday commands
