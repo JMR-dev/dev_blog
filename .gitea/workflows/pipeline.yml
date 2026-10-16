@@ -398,6 +398,8 @@ jobs:
           command -v ssh && exit 0
           SUDO=""; [[ $(id -u) -ne 0 ]] && SUDO=sudo
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq --no-install-recommends openssh-client
+      - if: env.KICK == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The quadlets track :prod with AutoUpdate=registry, so the VM's own
       # auto-update timer would pick the new images up eventually; this makes
       # it immediate. A failed start rolls back by itself (Notify=healthy).
@@ -407,7 +409,7 @@ jobs:
           for i in $(seq 1 10); do
             if gcloud compute ssh "$VM" --zone="$GCP_ZONE" --project="$GCP_PROJECT" \
                  --tunnel-through-iap --quiet \
-                 --command 'sudo systemctl start podman-auto-update.service && sudo podman ps'; then
+                 --command 'sudo bash -s' < scripts/vm-rollout.sh; then
               exit 0
             fi
             echo "rollout attempt $i/10 failed; retrying in 30s"
