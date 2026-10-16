@@ -331,6 +331,20 @@ jobs:
           docker build -f image/app/Dockerfile \
             --build-arg "CADDY_VERSION=$CADDY_VERSION" \
             --tag "$AR/blog:prod" --tag "$AR/blog:$SHORT_SHA" .
+          # Run it the way vm/quadlets/blog.container does before it can
+          # become :prod. A local podman build once hid a permissions bug
+          # that only BuildKit produced, and the first deploy has no
+          # previous image for auto-update to roll back to.
+          docker run -d --name smoke --read-only --tmpfs /tmp:rw,size=16m,mode=1777 \
+            --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges "$AR/blog:prod"
+          ok=""
+          for _ in $(seq 1 15); do
+            if docker exec smoke curl -fsS -o /dev/null http://127.0.0.1:8080/; then ok=1; break; fi
+            sleep 2
+          done
+          docker logs smoke 2>&1 | tail -5
+          docker rm -f smoke >/dev/null
+          [[ -n "$ok" ]] || { echo "site image did not serve / as uid 1000 on a read-only root" >&2; exit 1; }
           docker push --all-tags "$AR/blog"
           # Rollback targets: re-point :prod at one of these (docs/runbook.md).
           docker image inspect "$AR/blog:prod" --format '{{index .RepoDigests 0}}'
