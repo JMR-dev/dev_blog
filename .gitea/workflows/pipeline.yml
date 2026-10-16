@@ -192,9 +192,8 @@ jobs:
           SUDO=""; [[ $(id -u) -ne 0 ]] && SUDO=sudo
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq shellcheck
       # go build + vet + the mock-runtime invariant tests; bash -n and
-      # shellcheck over the VM and bootstrap scripts. Wrapped because the
-      # compile is silent for minutes (scripts/ci-keepalive.sh says why).
-      - run: scripts/ci-keepalive.sh make check
+      # shellcheck over the VM and bootstrap scripts.
+      - run: make check
 
   # Pull requests: show what merging would change. Same-repo PRs only -- Gitea
   # withholds secrets from forks, and this instance has no outside forks.
@@ -225,10 +224,10 @@ jobs:
       - name: pulumi preview
         working-directory: infra
         run: |
-          ../scripts/ci-keepalive.sh go build -o blog-infra .
+          go build -o blog-infra .
           pulumi login "$PULUMI_BACKEND"
           pulumi stack select prod
-          ../scripts/ci-keepalive.sh pulumi preview --diff --non-interactive
+          pulumi preview --diff --non-interactive
 
   infra:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -268,10 +267,10 @@ jobs:
         name: pulumi up
         working-directory: infra
         run: |
-          ../scripts/ci-keepalive.sh go build -o blog-infra .
+          go build -o blog-infra .
           pulumi login "$PULUMI_BACKEND"
           pulumi stack select prod
-          ../scripts/ci-keepalive.sh pulumi up --yes --diff --non-interactive
+          pulumi up --yes --diff --non-interactive
       - if: env.RUN == 'true'
         name: Install an SSH client for IAP
         run: |

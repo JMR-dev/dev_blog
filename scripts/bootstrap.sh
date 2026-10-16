@@ -67,6 +67,7 @@ gcloud services enable --project="${PROJECT}" \
     logging.googleapis.com \
     monitoring.googleapis.com \
     iamcredentials.googleapis.com \
+    cloudresourcemanager.googleapis.com \
     oslogin.googleapis.com
 
 # ---------------------------------------------------------------------------
