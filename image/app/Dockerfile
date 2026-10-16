@@ -72,7 +72,12 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends ca-certificates curl; \
     rm -rf /var/lib/apt/lists/*; \
     groupadd --gid 1000 site; \
-    useradd --uid 1000 --gid 1000 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin site
+    useradd --uid 1000 --gid 1000 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin site; \
+    # Created here, not by the COPY below: BuildKit applies COPY --chmod to
+    # the parent directories it creates as well, which made /etc/caddy 0644
+    # -- untraversable for uid 1000 ("open /etc/caddy/Caddyfile: permission
+    # denied"). Buildah does not, so a local podman build hid it.
+    install -d -m 0755 /etc/caddy
 
 COPY --from=caddy --chown=root:root --chmod=0755 /usr/bin/caddy /usr/local/bin/caddy
 
