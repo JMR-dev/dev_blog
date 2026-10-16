@@ -19,6 +19,10 @@ var services = []string{
 	"logging.googleapis.com",
 	"monitoring.googleapis.com",
 	"iamcredentials.googleapis.com",
+	// Project-level IAM bindings (projects.IAMMember) read and write the
+	// project policy through this API. A project that has never had it on fails
+	// those bindings with a 403 "Cloud Resource Manager API has not been used".
+	"cloudresourcemanager.googleapis.com",
 	"oslogin.googleapis.com",
 }
 

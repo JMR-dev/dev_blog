@@ -647,9 +647,14 @@ main() {
     self_update "$@"
 
     if [[ "${MODE}" == "full" ]]; then
+        # Swap BEFORE packages. The first-boot dnf transaction (EPEL metadata,
+        # fail2ban's SELinux module rebuild) is the most memory this box ever
+        # needs; on an e2-micro (1 GB) with no swap it ran for 15+ minutes at
+        # ~50 MB free while the image's own dnf-automatic competed with it.
+        # setup_swap needs only dd/mkswap/swapon, which the base image has.
+        setup_swap
         install_packages
         setup_data_disk
-        setup_swap
         configure_podman
         install_helpers
         install_ar_auth
