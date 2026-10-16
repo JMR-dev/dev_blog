@@ -1,0 +1,26 @@
+# The app container's server: static files only, behind the edge Caddy.
+{
+	# No admin API and no config autosave: the config is baked into the image
+	# and nothing should be able to change it at runtime.
+	admin off
+	persist_config off
+	# Plain HTTP; the edge terminates TLS.
+	auto_https off
+}
+
+:8080 {
+	root * /srv
+
+	# Astro fingerprints everything under /_astro/, so a given URL's content
+	# never changes. Everything else (HTML, feeds) must revalidate so a deploy
+	# shows up immediately.
+	# Two disjoint matchers, not a matcher plus a catch-all: same-named
+	# directives with named matchers keep source order, so a bare `header`
+	# after the first would overwrite it.
+	@hashed path /_astro/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+	@unhashed not path /_astro/*
+	header @unhashed Cache-Control "public, max-age=0, must-revalidate"
+
+	file_server
+}

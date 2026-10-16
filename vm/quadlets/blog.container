@@ -1,0 +1,90 @@
+# Rendered by vm/bootstrap.sh into /etc/containers/systemd/
+#
+# The image contract this unit assumes (image/app/Dockerfile):
+#   - serves plain HTTP on ${APP_PORT}, behind Caddy
+#   - answers 200 on ${HEALTH_PATH} when healthy
+#   - runs as uid 1000 and keeps its state under ${APP_DATA_PATH}
+#   - has curl, for the healthcheck below
+[Unit]
+Description=blog
+# A hard dependency (Requires= + After=) on the data disk mount: without it
+# podman happily creates an empty /var/lib/blog on the boot disk, and the app
+# initialises a FRESH install on top of the unmounted path -- which looks exactly
+# like total data loss. RequiresMountsFor= takes the path, so it stays right
+# even when systemd escapes the unit name (a hyphen in the path becomes \x2d).
+RequiresMountsFor=/var/lib/blog
+# Wants= (not just After=): the registry credential has to be written before the
+# first pull, and the refresh timer alone would not guarantee that at boot.
+Wants=blog-ar-auth.service
+After=blog-ar-auth.service network-online.target
+
+[Container]
+ContainerName=blog
+Image=${IMAGE_APP}
+# Floating tag, deliberately. AutoUpdate=registry compares the local digest
+# against the registry's digest FOR A TAG; a digest-pinned image would give it
+# nothing to poll and the feature would be silently dead.
+AutoUpdate=registry
+# Registry auth for Artifact Registry. Two settings, because two different
+# code paths need it: PodmanArgs covers `podman run`'s pull, and the
+# io.containers.autoupdate.authfile label is what `podman auto-update` reads
+# when it checks the registry digest. (There is no AuthFile= key in the
+# [Container] group -- that one only exists for .image and .build units.)
+PodmanArgs=--authfile=/etc/containers/ar-auth.json
+Label=io.containers.autoupdate.authfile=/etc/containers/ar-auth.json
+Network=blog.network
+LogDriver=journald
+
+# HTTP is loopback-only on the host: Caddy is the only thing that should reach
+# it. On the bridge Caddy uses blog:${APP_PORT} directly; this binding is what
+# the host-network fallback uses, so the wiring works in both modes.
+PublishPort=127.0.0.1:${APP_PORT}:${APP_PORT}
+# An extra public port the app serves itself (SSH, SMTP, ...): publish it here,
+# then see the recipe in infra/pkg/network/network.go -- three more files.
+# PublishPort=2222:2222
+
+# No :z/:Z on the data volume -- bootstrap.sh sets a persistent SELinux fcontext
+# for it instead. A relabel flag here would force a recursive relabel of the
+# entire data tree on every single container start.
+Volume=/var/lib/blog:${APP_DATA_PATH}
+
+# Rendered from vm/config/app.env.tmpl, secrets included. podman reads it on the
+# host at create time; the file is never visible inside the container. Values
+# are taken literally -- no quotes, no shell expansion.
+EnvironmentFile=/etc/blog/app.env
+# An app configured by a file instead: render it in bootstrap.sh's render_all
+# and mount it read-only (the :Z here is cheap -- it is one file).
+# Volume=/etc/blog/app.toml:/etc/blog/app.toml:ro,Z
+
+User=1000:1000
+
+# The image is a static file server with the site baked in: nothing writes at
+# runtime except Caddy's scratch state, which image/app/Dockerfile points at
+# /tmp.
+ReadOnly=true
+Tmpfs=/tmp:rw,size=16m,mode=1777
+
+# Notify=healthy is what arms auto-update rollback. Rollback only fires when the
+# restarted unit fails to START; without this, a container that starts and is
+# broken would never roll back.
+HealthCmd=curl -fsS http://127.0.0.1:${APP_PORT}${HEALTH_PATH}
+HealthInterval=30s
+HealthTimeout=5s
+HealthStartPeriod=60s
+HealthRetries=3
+Notify=healthy
+
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+# On first boot the :prod image does not exist yet (it is built by the first
+# pipeline run). StartLimitIntervalSec=0 lets the unit retry indefinitely
+# instead of hitting the start limit and parking in `failed` forever.
+RestartSec=30
+StartLimitIntervalSec=0
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

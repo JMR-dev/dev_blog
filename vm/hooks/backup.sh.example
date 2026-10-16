@@ -1,0 +1,25 @@
+# vm/hooks/backup.sh -- the application's own backup. APP-SPECIFIC.
+#
+# Shipped as backup.sh.example, so it is inert: with no vm/hooks/backup.sh, the
+# nightly timer logs "relying on PD snapshots alone" and exits 0. Copy it to
+# backup.sh and replace the body below to turn dumps on.
+#
+# Contract: write ONE complete dump to stdout and exit 0, or exit non-zero.
+# /usr/local/bin/blog-backup streams stdout to gs://<project>-blog-backups/
+# dumps/blog-<stamp>.dump and writes the .ok marker only after this exits 0.
+# Runs as root on the host, so `podman exec` into the container is available.
+#
+# Prefer the app's native, consistent export over copying files:
+#   podman exec -u 1000 blog <app> dump --to-stdout     # an app with a dump command
+#   podman exec blog-db pg_dump -Fc -U app app           # a PostgreSQL sidecar
+#   podman exec -u 1000 blog sqlite3 /data/app.db .dump  # SQLite (needs sqlite3 in the image)
+#
+# Do NOT tar the live data directory: a tarball of files the app is writing to
+# looks like a backup and restores as corruption. If the app has no consistent
+# export, delete this file -- the daily PD snapshot (crash-consistent) is then
+# the backup, and that is a decision you should make knowingly.
+#
+set -euo pipefail
+
+echo "vm/hooks/backup.sh has not been written for this app yet" >&2
+exit 1

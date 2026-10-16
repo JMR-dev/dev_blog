@@ -1,20 +1,23 @@
-# Podman-compose / Docker-compose file for the dev-blog stack.
+# Local development stack. It builds the same two images production runs
+# (image/app and image/caddy) but swaps in caddy/Caddyfile.dev, which uses
+# `tls internal` -- no ACME, no Cloud DNS, no cloud credentials.
 #
-# This is provided as a convenience for local iteration; production deployments
-# should use the Quadlet units in ./quadlet/ which integrate with systemd.
+# Production does not use compose: the VM runs the quadlets in vm/quadlets/.
 #
-# Usage:
-#   podman compose up --build
+#   make dev    # reads the pinned versions from image/*.version, then
+#               # http://localhost:8080 and https://localhost:8443
 #
-# The Caddy container needs a Google Cloud service-account JSON key mounted at
-# /run/secrets/gcp-dns.json for the ACME DNS-01 challenge to work. For local
-# HTTP-only development, set SITE_ADDRESS=http://:80 in your shell or .env.
+# Static IPs plus an /etc/hosts entry for `app` work around aardvark-dns keeping
+# stale records between rootless `podman compose down` / `up` cycles.
 
 name: dev-blog
 
 networks:
   dev-blog:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.99.0/24
 
 volumes:
   caddy-data:
@@ -24,22 +27,20 @@ services:
   app:
     build:
       context: .
-      dockerfile: Containerfile
-    image: localhost/dev-blog-app:latest
+      dockerfile: image/app/Dockerfile
+      args:
+        CADDY_VERSION: ${CADDY_VERSION:?run `make dev`, which reads image/caddy.version}
+    image: localhost/dev-blog-app:dev
     container_name: dev-blog-app
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      HOST: 0.0.0.0
-      PORT: "4321"
-      ASTRO_TELEMETRY_DISABLED: "1"
     networks:
-      - dev-blog
+      dev-blog:
+        ipv4_address: 10.89.99.10
     expose:
-      - "4321"
+      - "8080"
+    # Same hardening as vm/quadlets/blog.container.
     read_only: true
     tmpfs:
-      - /tmp:size=64m,mode=1777
+      - /tmp:size=16m,mode=1777
     cap_drop:
       - ALL
     security_opt:
@@ -47,38 +48,32 @@ services:
 
   caddy:
     build:
-      context: ./caddy
-      dockerfile: Containerfile
-    image: localhost/dev-blog-caddy:latest
+      context: image/caddy
+      args:
+        CADDY_VERSION: ${CADDY_VERSION:?run `make dev`, which reads image/caddy.version}
+        CORAZA_VERSION: ${CORAZA_VERSION:?run `make dev`, which reads image/coraza.version}
+    image: localhost/dev-blog-caddy:dev
     container_name: dev-blog-caddy
-    restart: unless-stopped
     depends_on:
       - app
-    environment:
-      SITE_ADDRESS:  ${SITE_ADDRESS:-https://example.com}
-      ACME_EMAIL:    ${ACME_EMAIL:-admin@example.com}
-      GCP_PROJECT:   ${GCP_PROJECT:-my-gcp-project}
-      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-dns.json
-    secrets:
-      - gcp-dns
     networks:
-      - dev-blog
-    ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-      - "${HTTPS_PORT:-443}:443/udp"
+      dev-blog:
+        ipv4_address: 10.89.99.11
+    extra_hosts:
+      - "app:10.89.99.10"
     volumes:
+      - ./caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro,Z
       - caddy-data:/data
       - caddy-config:/config
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+      - "${HTTPS_PORT:-8443}:443/udp"
+    # The image runs as uid 1000; this lets it bind 80/443 inside its own
+    # network namespace, as vm/quadlets/caddy.container does on the bridge.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
     cap_drop:
       - ALL
-    cap_add:
-      - NET_BIND_SERVICE
     security_opt:
       - no-new-privileges:true
-
-secrets:
-  gcp-dns:
-    # Path to a Google Cloud service-account JSON key with permission to
-    # update Cloud DNS records for the SITE_ADDRESS zone.
-    file: ./secrets/gcp-dns.json

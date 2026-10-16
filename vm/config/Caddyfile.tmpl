@@ -1,0 +1,137 @@
+# Rendered by vm/bootstrap.sh -> /etc/caddy/Caddyfile
+#
+# Two compile-time plugins are doing the work here (image/caddy/Dockerfile):
+#
+#   googleclouddns -- ACME DNS-01, so issuance and renewal never need inbound 80
+#   coraza_waf     -- OWASP Coraza with the Core Rule Set embedded in the binary
+{
+	${CADDY_EMAIL}
+	# The quadlet's healthcheck polls this. Loopback only.
+	admin 127.0.0.1:2019
+	# Required by coraza-caddy: Caddy has no built-in ordering for a third-party
+	# directive, and the WAF must run before anything that could act on the
+	# request. Applies inside handle blocks too.
+	order coraza_waf first
+}
+
+${DOMAIN} {
+	tls {
+		dns googleclouddns {
+			# Application Default Credentials come from the GCE metadata server.
+			# The VM service account holds roles/dns.admin scoped to this zone, plus
+			# project-level dns.reader so the plugin can list zones to find it.
+			gcp_project {env.GCP_PROJECT}
+		}
+		# Only used for propagation checks. If issuance stalls waiting for
+		# propagation, this is the knob to turn.
+		resolvers 8.8.8.8 8.8.4.4
+	}
+
+	encode zstd gzip
+
+	# The ceiling for any request. A static site takes no uploads, so nothing
+	# legitimate comes close; this only bounds what the WAF has to buffer.
+	request_body {
+		max_size 1MB
+	}
+
+	# Deletions (-Server) make Caddy defer the whole block until the response is
+	# written, so these also apply to -- and strip from -- proxied responses.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# ---------------------------------------------------------------------
+	# Routes that must NOT go through the WAF. APP-SPECIFIC; none by default.
+	#
+	# Bypass a route only when BOTH hold:
+	#   1. CRS breaks it -- binary or non-form bodies (git packfiles, protobuf
+	#      / gRPC / Connect RPC, application/octet-stream uploads), methods
+	#      outside tx.allowed_methods (PUT, PATCH, PROPFIND...), or bodies
+	#      larger than SecRequestBodyLimit that must not be truncated.
+	#   2. The app authenticates every request on it itself, so the WAF was
+	#      not the only thing in the way.
+	# Verify (1) with an experiment in wafMode On, not by assumption, and
+	# write down which one it was in the comment. Prefer path prefixes over
+	# lists of endpoint names: an app upgrade that adds an endpoint should
+	# not silently start 403ing.
+	#
+	# @nowaf path_regexp ^/[^/]+/[^/]+/(?:info/refs|git-upload-pack|git-receive-pack)$
+	# handle @nowaf {
+	# 	reverse_proxy ${APP_UPSTREAM} {
+	# 		transport http {
+	# 			read_timeout 900s
+	# 			write_timeout 900s
+	# 		}
+	# 	}
+	# }
+	# ---------------------------------------------------------------------
+
+	# ---------------------------------------------------------------------
+	# Everything else goes through the WAF.
+	# ---------------------------------------------------------------------
+	handle {
+		coraza_waf {
+			load_owasp_crs
+			directives `
+			Include @coraza.conf-recommended
+			Include @crs-setup.conf.example
+			# Rule-set configuration (SecAction setvar:...) goes here, BEFORE
+			# the rules are loaded.
+
+			# /_astro/ holds Astro's content-hashed bundles, images and the
+			# self-hosted fonts: immutable static files, so nothing in a request
+			# for them reaches code, and inspecting them only costs CPU and
+			# risks false positives on long hashed names. A runtime ctl: rule,
+			# so it sits BEFORE the CRS includes -- placed after, CRS's own
+			# phase-1 rules would already have run.
+			SecRule REQUEST_FILENAME "@beginsWith /_astro/" "id:1000001,phase:1,pass,nolog,ctl:ruleEngine=Off"
+
+			Include @owasp_crs/*.conf
+			# Exclusions (SecRuleRemoveById, SecRuleUpdateTargetById, ctl:
+			# rules) go here, AFTER. Ids 1,000,000+; CRS reserves below. One
+			# comment per exclusion: which rule, which endpoint, and why.
+
+			# DetectionOnly logs what it would have blocked without blocking.
+			# The fail2ban jail is enabled ONLY when this is On -- banning on
+			# detections that were never blocks would turn a false positive
+			# into an nftables ban, which is worse than the 403 it avoided.
+			SecRuleEngine ${WAF_MODE}
+
+			# Response inspection costs CPU and catches little worth catching.
+			SecResponseBodyAccess Off
+
+			# Truncate-and-inspect rather than reject: a large but legitimate
+			# upload should not 413 because the WAF gave up.
+			SecRequestBodyLimitAction ProcessPartial
+
+			# RelevantOnly, not On. Auditing every request would pour the full
+			# request volume into journald and then into Cloud Logging.
+			SecAuditEngine RelevantOnly
+
+			# The default relevant-status audits every 401, and on a public host
+			# unauthenticated probes produce those constantly -- burying the
+			# would-be blocks this log exists to surface. Narrowed to real WAF
+			# refusals and server errors; rule-triggered transactions are still
+			# audited regardless of status, which is what keeps DetectionOnly
+			# useful.
+			SecAuditLogRelevantStatus "^(?:5[0-9]{2}|403)$"
+
+			SecAuditLog /dev/stdout
+			SecAuditLogFormat json
+			SecAuditLogParts ABIJDEFHZ
+			`
+		}
+
+		reverse_proxy ${APP_UPSTREAM}
+	}
+
+	log {
+		output stderr
+		format json
+	}
+}

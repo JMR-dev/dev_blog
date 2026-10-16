@@ -1,0 +1,49 @@
+# Rendered by vm/bootstrap.sh as /etc/fail2ban/jail.d/blog.local
+# (substituting ${PODMAN_SUBNET} and ${CORAZA_JAIL_ENABLED}).
+
+[DEFAULT]
+# Podman's journald log driver tags container output with CONTAINER_NAME, so
+# there are no log files to bind-mount, rotate, or keep in sync.
+backend  = systemd
+
+# Every ban goes through the prerouting action. The stock nftables/iptables
+# actions install INPUT rules, which do not see DNAT'd container traffic at all
+# -- `fail2ban-client status` reports the ban and the traffic flows anyway.
+banaction     = nft-prerouting
+banaction_allports = nft-prerouting
+
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+
+# Never lock out loopback, the podman bridge, or the IAP range -- IAP is the
+# only way back into this box. Add any fixed address that legitimately retries
+# hard from one IP (a CI runner pool behind NAT, a monitoring probe) here, and
+# write down why: an exempted address is never banned, whatever it does.
+ignoreip = 127.0.0.1/8 ::1 ${PODMAN_SUBNET} 35.235.240.0/20
+
+[sshd]
+enabled  = true
+port     = 22
+# Belt-and-braces: port 22 already only accepts the IAP range, at both the VPC
+# firewall and nftables.
+maxretry = 5
+
+# No app jail: the site is static files with no login, so there are no
+# credential failures to count. Abuse shows up as WAF verdicts instead, below.
+
+[caddy-coraza]
+# Enabled ONLY when blog:wafMode is "On". In DetectionOnly the WAF reports what
+# it would have blocked but lets it through, and escalating those reports into
+# nftables bans would turn a tuning false positive into a locked-out user --
+# strictly worse than the 403 that DetectionOnly was chosen to avoid.
+# vm/bootstrap.sh derives this from the same config value as SecRuleEngine.
+enabled  = ${CORAZA_JAIL_ENABLED}
+filter   = caddy-coraza
+port     = 80,443
+journalmatch = CONTAINER_NAME=caddy
+# Deliberately looser than the auth jail. A WAF verdict is a weaker signal than
+# a failed password, so it takes sustained hostile traffic to earn a ban.
+maxretry = 10
+findtime = 10m
+bantime  = 2h

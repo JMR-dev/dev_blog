@@ -1,0 +1,45 @@
+# Stack configuration for the `prod` stack.
+#
+# Every value here is public infrastructure metadata, so none of it needs
+# `pulumi config set --secret`. Application secrets live in Secret Manager
+# (infra/secret-names.txt) and this program never reads them.
+#
+# `pulumi stack init prod` appends an `encryptionsalt:` line. Commit it: CI
+# cannot decrypt the stack without it.
+config:
+  gcp:project: dev-blog-494815
+  gcp:region: us-east1
+  blog:domain: blog.jasonmross.dev
+  # The Cloud DNS *resource* name of the existing managed zone, which is not
+  # necessarily the DNS name. `gcloud dns managed-zones list` to find it.
+  #
+  # `blog` is blog.jasonmross.dev., delegated from the `public` zone
+  # (jasonmross.dev.) by an NS record. scripts/bootstrap.sh creates both, so the
+  # VM's DNS-01 grant covers this subdomain only and never the parent zone.
+  blog:dnsZone: blog
+  # us-east1 has zones b, c and d. There is no us-east1-a.
+  blog:zone: us-east1-b
+  # e2-micro: 2 shared vCPU (burstable), 1 GB RAM, plus the 2 GB swap ballast
+  # vm/bootstrap.sh adds. A static file server and Caddy/Coraza fit with room
+  # to spare; memory, not CPU, is what runs out first. e2-small is the next step
+  # up and changes in place (a reboot, not a replacement).
+  blog:machineType: e2-micro
+  blog:bootDiskGb: "20"
+  # The site is stateless -- the disk is mounted but unused. 10 GB is the
+  # pd-balanced minimum.
+  blog:dataDiskGb: "10"
+  # The app container's contract: it serves plain HTTP on this port and
+  # answers 200 on this path when healthy. Caddy, the quadlet healthcheck and
+  # the image pipeline's post-rollout gate all read these.
+  blog:appPort: "8080"
+  # A static site has no health endpoint; the index page answering is the
+  # signal.
+  blog:healthPath: /
+  # Where the data disk is mounted inside the container.
+  blog:appDataPath: /data
+  # Pinned so the app's trusted-proxy setting can name it. See vm/quadlets/blog.network.
+  blog:podmanSubnet: 10.89.10.0/24
+  # Coraza WAF: On | DetectionOnly | Off. Start in DetectionOnly, review what
+  # it flags, then switch to On. The fail2ban WAF jail follows this value.
+  blog:wafMode: DetectionOnly
+encryptionsalt: v1:Tj5znAFOOxE=:v1:kcFEiVqCz5GBOb6C:y5fEmheDeVQRIr6FDLZ/I6W4KF6dRw==

@@ -1,5 +1,5 @@
 .git
-.github
+.gitea
 .vscode
 node_modules
 dist
@@ -12,3 +12,8 @@ e2e
 .env
 .env.*
 README.md
+# Deployment code: never part of the app image.
+infra
+vm
+scripts
+image/caddy

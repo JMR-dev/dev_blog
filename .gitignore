@@ -31,3 +31,6 @@ caddy-local-root.crt
 
 # jetbrains setting folder
 .idea/
+
+# The prebuilt Pulumi program binary (infra/Pulumi.yaml runtime.options.binary).
+infra/blog-infra

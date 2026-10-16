@@ -1,0 +1,15 @@
+# Rendered by vm/bootstrap.sh into /etc/containers/systemd/
+#
+# The subnet is PINNED deliberately. Left to podman it is drawn from the default
+# pool and is not stable across a network recreate -- and this CIDR is exactly
+# what the app's trusted-proxy setting (TRUSTED_PROXIES) has to name. An
+# unpinned subnet means a network recreate silently makes the app log Caddy's
+# address for every client, and every fail2ban ban then targets Caddy.
+[Unit]
+Description=blog container network
+
+[Network]
+NetworkName=blog
+Subnet=${PODMAN_SUBNET}
+Gateway=${PODMAN_GATEWAY}
+Label=app=blog
