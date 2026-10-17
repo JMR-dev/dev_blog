@@ -344,12 +344,17 @@ jobs:
             echo "CADDY_VERSION=$(tr -d '[:space:]' < image/caddy.version)"
             echo "CORAZA_VERSION=$(tr -d '[:space:]' < image/coraza.version)"
             echo "SHORT_SHA=${GITHUB_SHA::7}"
+            # Unique per run, not per commit: the weekly rebuild and a
+            # re-dispatch build the same commit again. The rollout job's
+            # health gate derives the same value.
+            echo "SITE_BUILD=${GITHUB_SHA::7}-${GITHUB_RUN_ID}"
           } >> "$GITHUB_ENV"
       - if: env.APP == 'true'
         name: Build and push the site image
         run: |
           docker build -f image/app/Dockerfile \
             --build-arg "CADDY_VERSION=$CADDY_VERSION" \
+            --build-arg "SITE_BUILD=$SITE_BUILD" \
             --tag "$AR/blog:prod" --tag "$AR/blog:$SHORT_SHA" .
           # Run it the way vm/quadlets/blog.container does before it can
           # become :prod. A local podman build once hid a permissions bug
@@ -362,9 +367,11 @@ jobs:
             if docker exec smoke curl -fsS -o /dev/null http://127.0.0.1:8080/; then ok=1; break; fi
             sleep 2
           done
+          marker=$(docker exec smoke curl -fsS http://127.0.0.1:8080/version.txt || true)
           docker logs smoke 2>&1 | tail -5
           docker rm -f smoke >/dev/null
           [[ -n "$ok" ]] || { echo "site image did not serve / as uid 1000 on a read-only root" >&2; exit 1; }
+          [[ "$marker" == "$SITE_BUILD" ]] || { echo "site image serves build marker '$marker', not '$SITE_BUILD'" >&2; exit 1; }
           docker push --all-tags "$AR/blog"
           # Rollback targets: re-point :prod at one of these (docs/runbook.md).
           docker image inspect "$AR/blog:prod" --format '{{index .RepoDigests 0}}'
@@ -406,32 +413,56 @@ jobs:
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq --no-install-recommends openssh-client
       # The quadlets track :prod with AutoUpdate=registry, so the VM's own
       # auto-update timer would pick the new images up eventually; this makes
-      # it immediate. A failed start rolls back by itself (Notify=healthy).
+      # it immediate. A failed start rolls back by itself (Notify=healthy), and
+      # vm-rollout.sh then exits 3: both units must end up on the registry's
+      # :prod. That stops the job at once -- a retry would only restart the bad
+      # image again. Anything else is taken as not having reached the VM and
+      # retried; never reaching it fails the job, since the old site would
+      # still pass a health gate.
       - if: env.KICK == 'true'
         name: Pull the new images on the VM
         run: |
           for i in $(seq 1 10); do
-            if gcloud compute ssh "$VM" --zone="$GCP_ZONE" --project="$GCP_PROJECT" \
-                 --tunnel-through-iap --quiet \
-                 --command 'sudo bash -s' < scripts/vm-rollout.sh; then
-              exit 0
-            fi
-            echo "rollout attempt $i/10 failed; retrying in 30s"
+            rc=0
+            gcloud compute ssh "$VM" --zone="$GCP_ZONE" --project="$GCP_PROJECT" \
+                --tunnel-through-iap --quiet \
+                --command 'sudo bash -s' < scripts/vm-rollout.sh || rc=$?
+            case $rc in
+              0) exit 0 ;;
+              3) echo "::error::the VM is not running the new :prod images (rolled back, or a unit is down); see the output above"; exit 1 ;;
+            esac
+            echo "rollout attempt $i/10 failed (exit $rc); retrying in 30s"
             sleep 30
           done
-          echo "::warning::could not reach the VM to trigger auto-update; relying on the health gate below"
+          echo "::error::could not run the rollout on the VM in 10 attempts"
+          exit 1
       # A pipeline that pushes a broken site and reports success is worse than
       # a failed one. Generous on purpose: a first deploy includes the VM's
       # package install, the first image pull, and ACME DNS-01 issuance.
+      # When this run built the site, a page from the OLD image is not a pass:
+      # wait for this run's build marker (images job, SITE_BUILD). A Caddy-only
+      # run does not rebuild the site, so it has no marker of its own.
       - name: Health gate
+        env:
+          APP: ${{ needs.changes.outputs.app }}
         run: |
+          want=""
+          [[ "$APP" == "true" ]] && want="${GITHUB_SHA::7}-${GITHUB_RUN_ID}"
+          got=""
           for i in $(seq 1 120); do
             if curl -fsS --max-time 10 -o /dev/null "$SITE_URL"; then
-              echo "$SITE_URL answered after $i attempt(s)"
-              exit 0
+              [[ -z "$want" ]] && { echo "$SITE_URL answered after $i attempt(s)"; exit 0; }
+              got=$(curl -fsS --max-time 10 "${SITE_URL}version.txt" || true)
+              [[ "$got" == "$want" ]] && { echo "$SITE_URL serves build $want after $i attempt(s)"; exit 0; }
+              echo "waiting for build $want; $SITE_URL serves '${got}' ($i/120)"
+            else
+              echo "waiting for $SITE_URL ($i/120)"
             fi
-            echo "waiting for $SITE_URL ($i/120)"
             sleep 10
           done
-          echo "$SITE_URL never answered -- check 'make status' and 'make logs'" >&2
+          if [[ -n "$got" ]]; then
+            echo "$SITE_URL still serves build '$got', not this run's '$want' -- the new image never went live (see 'journalctl -u podman-auto-update')" >&2
+          else
+            echo "$SITE_URL never answered -- check 'make status' and 'make logs'" >&2
+          fi
           exit 1

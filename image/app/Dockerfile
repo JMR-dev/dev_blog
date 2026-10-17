@@ -96,6 +96,12 @@ ENV XDG_CONFIG_HOME=/tmp/caddy-config \
 COPY --chown=root:root --chmod=0644 image/app/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build --chown=root:root /app/dist /srv
 
+# Which build this is, for the pipeline's health gate: it waits until the live
+# site serves this marker, not just any page. Set after the site is copied in,
+# so a new value only rebuilds this layer.
+ARG SITE_BUILD=dev
+RUN printf '%s\n' "${SITE_BUILD}" > /srv/version.txt
+
 USER 1000:1000
 EXPOSE 8080
 

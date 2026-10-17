@@ -15,8 +15,11 @@ Push to `main` (via a PR). `.gitea/workflows/pipeline.yml` then:
 3. if the site or the Caddy pins changed: builds the images, smoke-tests the
    site image as the quadlet runs it, and pushes `:prod` and `:<short-sha>` to
    Artifact Registry;
-4. kicks `podman-auto-update` on the VM over IAP and waits up to 20 minutes
-   for `https://blog.jasonmross.dev/` to answer.
+4. kicks `podman-auto-update` on the VM over IAP, fails unless both units
+   then run the registry's `:prod` (a rollback or a failed pull leaves the old
+   image serving), and waits up to 20 minutes for
+   `https://blog.jasonmross.dev/` to answer -- and, when it built the site, to
+   serve that build's marker at `/version.txt`.
 
 Deploys key off **source** only. Test code (`src/tests/`, `*.test.ts`,
 `e2e/`, `infra/*_test.go`), the pipeline itself, docs and tooling are tested
