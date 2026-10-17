@@ -18,7 +18,11 @@ export default defineConfig({
 		{ name: 'mobile-safari',  use: { ...devices['iPhone 14'] } },
 	],
 	webServer: {
-		command: 'pnpm build && pnpm preview --port 4321',
+		// --ignore-lock keeps `astro preview` in the foreground, where Playwright
+		// can stop it. Without it, Astro 7 detaches into the background when an
+		// AI agent runs it, and refuses to start while another preview holds the
+		// lock file.
+		command: 'pnpm build && pnpm preview --port 4321 --ignore-lock',
 		url: 'http://localhost:4321',
 		reuseExistingServer: !process.env.CI,
 		timeout: 180_000,
