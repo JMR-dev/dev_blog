@@ -62,7 +62,7 @@ env:
   AR: us-east1-docker.pkg.dev/dev-blog-494815/blog
   VM: blog-vm
   SITE_URL: https://blog.jasonmross.dev/
-  PULUMI_VERSION: "3.259.0"
+  PULUMI_VERSION: "3.270.0"
   PULUMI_BACKEND: gs://dev-blog-494815-pulumi-state
 
 jobs:
@@ -156,7 +156,7 @@ jobs:
 
   # One job for all five Playwright projects, inside the Playwright image that
   # matches the locked @playwright/test version: the browsers and their system
-  # libraries are already there, so nothing is downloaded at job time (a
+  # libraries are already there, so no browser is downloaded at job time (a
   # stalled browser download once hung this job for half an hour), and the
   # single runner slot pays for one checkout and install instead of five.
   # Bump the tag together with @playwright/test.
@@ -165,7 +165,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: mcr.microsoft.com/playwright:v1.59.1-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-resolute
     env:
       # Site, browser-test or pipeline changes. The weekly rebuild changes base
       # images, not the site, so build + unit still run and these do not.
@@ -173,16 +173,18 @@ jobs:
     steps:
       - if: env.RUN != 'true'
         run: echo "site, browser tests and pipeline unchanged -- skipping browser tests"
-      # The image has node but not git; without git, actions/checkout falls
-      # back to a GitHub-only tarball API.
-      - if: env.RUN == 'true'
-        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates
       - if: env.RUN == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - if: env.RUN == 'true'
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           run_install: false
+      # The image ships its own Node (24 as of v1.64); test on the release the
+      # site is built with, from package.json like the other jobs.
+      - if: env.RUN == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
       - if: env.RUN == 'true'
         run: pnpm install --frozen-lockfile
       - if: env.RUN == 'true'

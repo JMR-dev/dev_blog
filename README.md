@@ -6,11 +6,11 @@ A personal developer blog built to be fast, secure, and entirely self-hosted —
 
 ### Site
 
-- **[Astro v6](https://astro.build)** — generates static HTML at build time, served as plain files. Zero client-side JavaScript by default.
+- **[Astro v7](https://astro.build)** — generates static HTML at build time, served as plain files. Zero client-side JavaScript by default.
 - **Markdown & MDX** — posts live in `src/content/blog/` as typed Content Collections with frontmatter validation.
 - **RSS feed + sitemap** — auto-generated via `@astrojs/rss` and `@astrojs/sitemap`.
 - **Local fonts** — Atkinson Hyperlegible served from `src/assets/fonts/`, no external font requests.
-- **pnpm** — fast, disk-efficient package management. Requires Node ≥ 22.
+- **pnpm** — fast, disk-efficient package management. Requires Node 26.
 
 ### Testing
 
@@ -25,7 +25,7 @@ Two containers on one VM, both run by systemd through podman [quadlets](https://
 Internet ──► VPC firewall ──► nftables ──► Caddy :443 (TLS, WAF, headers) ──► site :8080 (static files)
 ```
 
-- **Site** (`image/app/`) — `astro build` in a Node 24 stage, then the output served by a stock Caddy file server on Debian slim. Runs as uid 1000 with a read-only root, all capabilities dropped and `no-new-privileges`.
+- **Site** (`image/app/`) — `astro build` in a Node 26 (Alpine) stage, then the output served by a stock Caddy file server on Debian slim. Runs as uid 1000 with a read-only root, all capabilities dropped and `no-new-privileges`.
 - **Edge** (`image/caddy/`) — Caddy built with [`xcaddy`](https://github.com/caddyserver/xcaddy) and two plugins:
   - **[coraza-caddy](https://github.com/corazawaf/coraza-caddy)** — the Coraza WAF with the OWASP Core Rule Set embedded in the binary.
   - **[caddy-dns/googleclouddns](https://github.com/caddy-dns/googleclouddns)** — ACME DNS-01, so certificates are issued and renewed without inbound port 80. It authenticates as the VM's own service account; there is no key on the box.

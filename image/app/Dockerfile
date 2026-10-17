@@ -15,7 +15,9 @@
 # Build from the repository root:
 #   docker build -f image/app/Dockerfile --build-arg CADDY_VERSION=$(cat image/caddy.version) .
 
-ARG NODE_TAG=24-trixie-slim
+# Floats with Node 26's minor/patch releases (package.json engines: ^26), so the
+# weekly rebuild picks them up. Only the build stage runs on it.
+ARG NODE_TAG=26-alpine
 ARG DEBIAN_TAG=13-slim
 # Used in a FROM line, so it has to be declared here, before the first FROM.
 ARG CADDY_VERSION
@@ -30,12 +32,16 @@ ENV PNPM_HOME=/pnpm \
     CI=1 \
     ASTRO_TELEMETRY_DISABLED=1
 
-RUN corepack enable
-
 WORKDIR /app
 
 # Dependency layer first, so a content-only change reuses the install.
 COPY package.json pnpm-lock.yaml ./
+# Node 25+ no longer ships corepack, so install the exact pnpm release that
+# package.json's packageManager names; one version to bump, here and in CI.
+# pnpm's install script fetches its native binary (musl here); npm 11 only
+# warns about unlisted install scripts, so allow it before npm starts blocking.
+RUN npm install -g --no-fund --no-audit --allow-scripts=pnpm \
+        "$(node -p "require('./package.json').packageManager")"
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 

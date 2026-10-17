@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-	gcpcompute "github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/compute"
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/serviceaccount"
+	gcpcompute "github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/compute"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/serviceaccount"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
 	"blog-infra/pkg/config"
