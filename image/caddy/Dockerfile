@@ -11,7 +11,8 @@
 # coraza-coreruleset Go package, which embeds the rules in the binary.
 
 ARG DEBIAN_TAG=13-slim
-ARG GOLANG_TAG=1.26-trixie
+# The same Go minor as infra/go.mod's toolchain line.
+ARG GOLANG_TAG=1.27-trixie
 
 # ---------------------------------------------------------------------------
 # Stage 1: build caddy with the googleclouddns plugin.
@@ -20,7 +21,7 @@ FROM golang:${GOLANG_TAG} AS build
 
 ARG CADDY_VERSION
 ARG CORAZA_VERSION
-ARG XCADDY_VERSION=latest
+ARG XCADDY_VERSION=v0.4.7
 
 ENV CGO_ENABLED=0 \
     GOTOOLCHAIN=local
