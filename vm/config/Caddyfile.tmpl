@@ -79,6 +79,21 @@ ${DOMAIN} {
 			load_owasp_crs
 			directives `
 			Include @coraza.conf-recommended
+
+			# Coraza keeps the first SecArgumentsLimit arguments from each
+			# source (query, path, body) and drops the rest, so padding a
+			# request with filler parameters would hide a payload from every
+			# ARGS rule. Coraza's own recommended config rejects such requests
+			# (its 200004/200005), but the copy embedded with CRS 4.25.0
+			# predates them. Our ids, not theirs: Coraza refuses to load a
+			# duplicated id, so a newer embedded copy would stop Caddy. Above
+			# the /_astro/ bypass, so the cap applies there too. If something
+			# legitimate needs more arguments, raise the limit rather than
+			# removing the rules.
+			SecArgumentsLimit 1000
+			SecRule ARGUMENTS_LIMIT_REACHED "@eq 1" "id:1000002,phase:1,t:none,log,deny,status:400,msg:'Argument limit reached; request rejected (query/path args)'"
+			SecRule ARGUMENTS_LIMIT_REACHED "@eq 1" "id:1000003,phase:2,t:none,log,deny,status:400,msg:'Argument limit reached; request rejected (body args)'"
+
 			Include @crs-setup.conf.example
 			# Rule-set configuration (SecAction setvar:...) goes here, BEFORE
 			# the rules are loaded.
