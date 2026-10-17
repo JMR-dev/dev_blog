@@ -62,7 +62,7 @@ env:
   AR: us-east1-docker.pkg.dev/dev-blog-494815/blog
   VM: blog-vm
   SITE_URL: https://blog.jasonmross.dev/
-  PULUMI_VERSION: "3.259.0"
+  PULUMI_VERSION: "3.270.0"
   PULUMI_BACKEND: gs://dev-blog-494815-pulumi-state
 
 jobs:

@@ -2,7 +2,7 @@
 package registry
 
 import (
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/artifactregistry"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/artifactregistry"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
 	"blog-infra/pkg/config"
