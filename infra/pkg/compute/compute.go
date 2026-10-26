@@ -148,6 +148,13 @@ func New(ctx *pulumi.Context, cfg *config.Config, a Args, deps []pulumi.Resource
 		// which keeps that change visible in `pulumi preview`.
 		"config-hash": pulumi.String(a.Buckets.ConfigHash),
 	}
+	// The secret's NAME, in project watchtower-observe; vm/bootstrap.sh reads
+	// the peer config itself, as this VM's service account. Left out when
+	// unset, so the VM tears the tunnel and Alloy down. Metadata changes in
+	// place.
+	if cfg.WatchtowerPeerSecret != "" {
+		metadata["watchtower-peer-secret"] = pulumi.String(cfg.WatchtowerPeerSecret)
+	}
 
 	vm, err := gcpcompute.NewInstance(ctx, "blog-vm", &gcpcompute.InstanceArgs{
 		Name:        pulumi.String("blog-vm"),

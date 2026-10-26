@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -36,7 +37,17 @@ type Config struct {
 	// WAFMode is the Coraza SecRuleEngine setting. It also decides whether the
 	// fail2ban jail that acts on WAF verdicts is enabled at all.
 	WAFMode string
+
+	// WatchtowerPeerSecret names the secret in project watchtower-observe that
+	// holds this VM's WireGuard peer config for the watchtower VPN.
+	// vm/bootstrap.sh fetches it as the VM's own service account and ships
+	// logs and metrics through that tunnel (vm/quadlets/alloy.container).
+	// Empty means no tunnel and no Alloy. A name, never a value.
+	WatchtowerPeerSecret string
 }
+
+// A Secret Manager secret id.
+var secretIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,255}$`)
 
 func Load(ctx *pulumi.Context) (*Config, error) {
 	gcp := config.New(ctx, "gcp")
@@ -60,6 +71,8 @@ func Load(ctx *pulumi.Context) (*Config, error) {
 		AppDataPath: c.Get("appDataPath"),
 
 		WAFMode: c.Get("wafMode"),
+
+		WatchtowerPeerSecret: c.Get("watchtowerPeerSecret"),
 	}
 
 	applyDefaults(cfg)
@@ -136,6 +149,10 @@ func validate(c *Config) error {
 	if !strings.HasSuffix(c.PodmanCIDR, "/24") {
 		// gatewayFor in package compute derives the .1 gateway from a /24.
 		return fmt.Errorf("%s:podmanSubnet %q must be a /24", Namespace, c.PodmanCIDR)
+	}
+	if c.WatchtowerPeerSecret != "" && !secretIDPattern.MatchString(c.WatchtowerPeerSecret) {
+		// The id alone, not a resource path: vm/bootstrap.sh supplies the project.
+		return fmt.Errorf("%s:watchtowerPeerSecret %q is not a secret id", Namespace, c.WatchtowerPeerSecret)
 	}
 	return nil
 }
