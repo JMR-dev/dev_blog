@@ -1,0 +1,70 @@
+# Rendered by vm/bootstrap.sh into /etc/containers/systemd/
+#
+# Grafana Alloy: ships this host's journal (every unit, the site and Caddy
+# included, LogDriver=journald) and its metrics to watchtower's Loki and Mimir,
+# through the watchtower WireGuard tunnel (wg-quick@wg-watchtower). Config:
+# vm/config/config.alloy.tmpl, rendered to /etc/blog/alloy/config.alloy.
+#
+# Not part of the site: bootstrap.sh renders it and the tunnel apart from the
+# blog and Caddy units, and restarts them only when they changed, never the
+# site with them.
+[Unit]
+Description=Grafana Alloy (journal and metrics -> watchtower)
+# No tunnel, no Alloy: watchtower.jasonmross.dev resolves to 10.8.0.1, which
+# exists only inside the tunnel. bootstrap.sh removes the tunnel config while
+# there is no peer (blog:watchtowerPeerSecret unset, or its secret empty), and
+# this unit is then skipped at boot, not failed.
+ConditionPathExists=/etc/wireguard/wg-watchtower.conf
+Wants=wg-quick@wg-watchtower.service network-online.target
+After=wg-quick@wg-watchtower.service network-online.target
+
+[Container]
+ContainerName=alloy
+# Tag plus digest (the multi-arch index): the release watchtower's contract
+# pins. No AutoUpdate=, so podman-auto-update and scripts/vm-rollout.sh leave
+# it alone; bump it here by hand.
+Image=docker.io/grafana/alloy:v1.21.2@sha256:89a5a320168387336b9ac3c850609c3ba7757eadd4ae5f1d819deb35e9854b18
+# The host's network, so pushes route through the tunnel interface and Caddy's
+# metrics (127.0.0.1:2020) are on loopback in either Caddy mode. Alloy's own
+# UI listens on 127.0.0.1:12345 only (Exec= below), and nothing else.
+Network=host
+LogDriver=journald
+Exec=run /etc/alloy/config.alloy --storage.path=/var/lib/alloy/data --server.http.listen-addr=127.0.0.1:12345 --disable-reporting
+
+Volume=/etc/blog/alloy/config.alloy:/etc/alloy/config.alloy:ro
+# The journal cursor and the WAL, so a restart or a tunnel outage resumes
+# where shipping stopped.
+Volume=alloy-data.volume:/var/lib/alloy/data
+# The persistent journal, read-only (bootstrap.sh's setup_journald). EL keeps
+# its files 0640 root:systemd-journal, so the image's own non-root user plus
+# that one group can read them.
+Volume=/var/log/journal:/var/log/journal:ro
+Volume=/etc/machine-id:/etc/machine-id:ro
+# The host's view for prometheus.exporter.unix, read-only. Root-only files
+# stay unreadable: Alloy runs as uid 473 with no capabilities.
+Volume=/proc:/host/proc:ro
+Volume=/sys:/host/sys:ro
+Volume=/:/host/root:ro,rslave
+User=473
+GroupAdd=${JOURNAL_GID}
+# A confined container cannot read the host journal (container_t has no
+# access to var_log_t); the same exception SilverBullet and watchtower make
+# for their log shippers.
+SecurityLabelDisable=true
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+
+# An e2-micro has 1 GB: an OOM kills Alloy, not the site. The Go heap target
+# sits under the cap so the collector frees memory before the kernel steps in.
+PodmanArgs=--memory=192m
+Environment=GOMEMLIMIT=150MiB
+
+[Service]
+Restart=always
+RestartSec=30
+# The first start pulls the image.
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
