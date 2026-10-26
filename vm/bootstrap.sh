@@ -124,6 +124,11 @@ install_packages() {
     else
         warn "fail2ban not installable from configured repos -- skipping fail2ban setup"
     fi
+
+    # Rotation for the Coraza audit log. Apart from the line above, so a
+    # missing package never stops the site's boot. A sync installs it too
+    # (setup_caddy_logs), since a sync skips this function.
+    dnf -y install logrotate || warn "logrotate not installable"
 }
 
 # ---------------------------------------------------------------------------
@@ -471,12 +476,16 @@ render_all() {
         return 0
     fi
 
-    local caddy_mode caddy_network caddy_publish caddy_sysctl app_upstream
+    # caddy_metrics_bind: where the Caddyfile's :2020 metrics site listens.
+    # Loopback on the host network; on the bridge, inside the container,
+    # published on the host's loopback only.
+    local caddy_mode caddy_network caddy_publish caddy_sysctl caddy_metrics_bind app_upstream
     caddy_mode=$(probe_caddy_network)
     if [[ "${caddy_mode}" == "host" ]]; then
         caddy_network="host"
         caddy_publish="# Network=host: ports are bound directly, publishing would be invalid."
         caddy_sysctl="# Network=host: podman rejects net.* sysctls; set on the host instead."
+        caddy_metrics_bind="bind 127.0.0.1"
         app_upstream="127.0.0.1:${APP_PORT}"
         # Container-local sysctls are unavailable on the host network, so allow
         # unprivileged binds to 80/443 host-wide. Narrower than granting the
@@ -485,8 +494,9 @@ render_all() {
         sysctl -q -p /etc/sysctl.d/90-blog-caddy.conf || warn "could not apply unprivileged port sysctl"
     else
         caddy_network="blog.network"
-        caddy_publish=$'PublishPort=80:80\nPublishPort=443:443\nPublishPort=443:443/udp'
+        caddy_publish=$'PublishPort=80:80\nPublishPort=443:443\nPublishPort=443:443/udp\nPublishPort=127.0.0.1:2020:2020'
         caddy_sysctl="Sysctl=net.ipv4.ip_unprivileged_port_start=0"
+        caddy_metrics_bind="# bridge: caddy.container publishes this on the host's loopback only"
         app_upstream="blog:${APP_PORT}"
         rm -f /etc/sysctl.d/90-blog-caddy.conf
     fi
@@ -512,7 +522,11 @@ render_all() {
            CADDY_NETWORK="${caddy_network}" \
            CADDY_PUBLISH_PORTS="${caddy_publish}" \
            CADDY_SYSCTL="${caddy_sysctl}" \
+           CADDY_METRICS_BIND="${caddy_metrics_bind}" \
            CADDY_EMAIL="${caddy_email}"
+
+    # Before Caddy restarts with the directory mounted.
+    setup_caddy_logs
 
     local changed=0
 
@@ -530,7 +544,7 @@ render_all() {
         && changed=1
 
     render "${STATE_DIR}/config/Caddyfile.tmpl" /etc/caddy/Caddyfile root:root 0644 \
-        '${DOMAIN} ${CADDY_EMAIL} ${APP_UPSTREAM} ${WAF_MODE}' \
+        '${DOMAIN} ${CADDY_EMAIL} ${APP_UPSTREAM} ${WAF_MODE} ${CADDY_METRICS_BIND}' \
         && changed=1
 
     local unit
@@ -560,6 +574,23 @@ render_all() {
     else
         log "configuration unchanged"
     fi
+}
+
+# ---------------------------------------------------------------------------
+# Coraza's audit log
+# ---------------------------------------------------------------------------
+# A record holds a whole request -- headers, cookies, bodies -- so Caddy
+# writes it to a file on this host (SecAuditLog in Caddyfile.tmpl, mounted by
+# caddy.container), never the journal, which Alloy ships to watchtower. Caddy's
+# uid owns the directory and nobody else may read it: Alloy, with / mounted
+# read-only, runs as another uid.
+setup_caddy_logs() {
+    install -d -o 1000 -g 1000 -m 0750 /var/log/caddy
+    if ! rpm -q logrotate >/dev/null 2>&1; then
+        dnf -y install logrotate || warn "logrotate not installable; the Coraza audit log will not rotate"
+    fi
+    install -m 0644 "${STATE_DIR}/logrotate/coraza-audit" /etc/logrotate.d/coraza-audit
+    systemctl enable --now logrotate.timer >/dev/null 2>&1 || warn "logrotate.timer not enabled"
 }
 
 # ---------------------------------------------------------------------------

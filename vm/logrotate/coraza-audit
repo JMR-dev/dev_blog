@@ -1,0 +1,15 @@
+# Installed by vm/bootstrap.sh as /etc/logrotate.d/coraza-audit.
+#
+# Coraza's audit log (SecAuditLog in vm/config/Caddyfile.tmpl), which stays on
+# this host. Coraza keeps the file open and cannot be told to reopen it, so
+# copytruncate. No `su`: the directory is uid 1000's and 0750, which logrotate
+# accepts as root.
+/var/log/caddy/coraza-audit.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
