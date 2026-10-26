@@ -93,6 +93,17 @@ loki.process "scrub" {
 		}
 	}
 
+	// A WAF rule match quotes what it matched as [data "..."]: a visitor's
+	// form value, header or cookie. The whole field goes, first, so a quoted
+	// "Referer: ..." or "Cookie: ..." can't set off a rule below that cuts to
+	// the end of the line and takes the fields after it. Coraza writes
+	// [severity "..."] right after it, once a line, so the greedy match ends
+	// at the real field even when the data holds a lookalike.
+	stage.replace {
+		expression = `(\[data \\?".*\\?"\] )\[severity `
+		replace    = ""
+	}
+
 	// A visitor's Referer names the page they came from: whole, as a JSON
 	// field (Caddy's access log), then as a header line. Visitor IPs go by
 	// the IP rules below.
@@ -104,15 +115,6 @@ loki.process "scrub" {
 	stage.replace {
 		expression = `(?i)\breferr?er\s*[:=]\s*([^\r\n]+)`
 		replace    = "[REDACTED-REFERER]"
-	}
-
-	// A WAF rule match quotes what it matched as [data "..."]: a visitor's
-	// form value, header or cookie. The whole field goes. Coraza writes
-	// [severity "..."] right after it, once a line, so the greedy match ends
-	// at the real field even when the data holds a lookalike.
-	stage.replace {
-		expression = `(\[data \\?".*\\?"\] )\[severity `
-		replace    = ""
 	}
 
 	// Coraza's audit records hold whole requests: headers, cookies, bodies.

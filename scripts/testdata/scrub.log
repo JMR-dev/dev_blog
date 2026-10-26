@@ -59,6 +59,7 @@ keep:69 fail2ban.actions [987]: NOTICE  [caddy-coraza] Ban 203.0.113.99
 keep:70 kernel: nft-drop-in: IN=eth0 OUT= MAC=42:01:0a:0a:00:02:42:01:0a:0a:00:01:08:00 SRC=192.0.2.200 DST=10.10.0.2 LEN=44 TOS=0x00 PREC=0x00 TTL=243 ID=54321 PROTO=TCP SPT=40000 DPT=23 WINDOW=1024 RES=0x00 SYN URGP=0
 keep:71 wg-quick[812]: [#] ip -4 address add 10.8.0.134/32 dev wg-watchtower
 keep:72 GET /posts/ HTTP/1.1 Referer: https://fakeLEAK72.example.org/page
+keep:73 {"level":"error","ts":1793018977.5,"logger":"http.handlers.waf","msg":"[client \"192.0.2.73\"] Coraza: Warning. XSS Filter - Category 1: Script Tag Vector [file \"@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf\"] [line \"5226\"] [id \"941110\"] [rev \"\"] [msg \"XSS Filter - Category 1: Script Tag Vector\"] [data \"Matched Data: <script> found within REQUEST_HEADERS:Referer: https://fakeLEAK73.example.org/?q=<script>\"] [severity \"critical\"] [ver \"OWASP_CRS/4.25.0\"] [maturity \"0\"] [accuracy \"0\"] [tag \"attack-xss\"] [hostname \"10.89.10.3\"] [uri \"/\"] [unique_id \"aB3dE5fG7hJ9kL1m\"]"}
 same:80 wg-quick[812]: [#] ip link set mtu 1380 up dev wg-watchtower
 same:81 blog-bootstrap[2210]: [blog-bootstrap] watchtower tunnel or Alloy changed -- restarting them
 same:82 podman[3120]: 2026-10-26 05:00:12.345678901 +0000 UTC m=+0.123456789 container health_status 7d3f8a1b2c4e (image=us-east1-docker.pkg.dev/dev-blog-494815/blog/blog:prod, name=blog, health_status=healthy)
