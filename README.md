@@ -34,6 +34,8 @@ Internet ──► VPC firewall ──► nftables ──► Caddy :443 (TLS, WA
 
 `make dev` runs the same two images locally with `podman compose` (see [CONTAINER.md](CONTAINER.md)).
 
+A third container, **Grafana Alloy** (`vm/quadlets/alloy.container`), is not part of the site: it ships the host's journal and metrics to watchtower, the owner's Loki/Mimir/Grafana, through a split WireGuard tunnel (`wg-watchtower`, 10.8.0.0/24 only). Logs are scrubbed on the host first (`vm/config/config.alloy.tmpl`; `make check-alloy` tests the rules). See [Telemetry](docs/runbook.md#telemetry-watchtower) in the runbook.
+
 ## Infrastructure
 
 Everything is code, and nothing is configured by hand on the host.
@@ -43,8 +45,9 @@ Everything is code, and nothing is configured by hand on the host.
 | Hosting | **Google Compute Engine** | One AlmaLinux 10 Shielded VM (`blog-vm`, e2-micro, `us-east1-b`) in project `dev-blog-494815`, with a static IP and daily snapshots. Admin access is IAP + OS Login only; port 22 is closed to the internet. |
 | DNS | **Google Cloud DNS** | `blog.jasonmross.dev` has its own zone (`blog`), delegated from the `jasonmross.dev` zone. The VM can write challenge records in that zone only. |
 | Provisioning | **[Pulumi](https://www.pulumi.com) (Go)** | `infra/` — network, firewall, VM, service accounts and per-resource IAM, Artifact Registry, the config bucket, DNS records. State in `gs://dev-blog-494815-pulumi-state`. |
-| Host configuration | **`vm/`** | Uploaded to a bucket by Pulumi and applied by `vm/bootstrap.sh` on every boot and every sync: packages, nftables, fail2ban, dnf-automatic with a weekly reboot window, podman quadlets, Artifact Registry auth. |
+| Host configuration | **`vm/`** | Uploaded to a bucket by Pulumi and applied by `vm/bootstrap.sh` on every boot and every sync: packages, nftables, fail2ban, dnf-automatic with a weekly reboot window, podman quadlets, Artifact Registry auth, the persistent journal, the watchtower tunnel and Alloy. |
 | Updates | **podman auto-update** | The quadlets track floating `:prod` tags; a new image is pulled and health-gated, and a failed start rolls back. |
+| Telemetry | **Grafana Alloy + WireGuard** | Logs and metrics to watchtower over its VPN, as agent peer `blog-vm`. The peer config is a secret in `watchtower-observe` that only `blog-vm@` reads, on the VM. Alloy is pinned by digest and never auto-updated. |
 | CI/CD | **Gitea Actions** | `.gitea/workflows/pipeline.yml`, on the GKE runners. Tests every push and PR, runs `pulumi preview` on PRs, and on `main` runs `pulumi up`, builds and pushes the images, rolls them out and waits for the site to answer. A weekly run rebuilds the images to pick up base-image fixes. |
 
 Operating it — first-time setup, deploys, rollbacks, drills — is in [docs/runbook.md](docs/runbook.md). The network path is described in [docs/networking.md](docs/networking.md).

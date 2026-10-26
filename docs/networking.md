@@ -47,6 +47,32 @@ table on EL, including netavark's, which silently drops the container port
 forwards until the containers restart. `vm/bootstrap.sh` already does it the
 safe way on each sync.
 
+## Out to watchtower
+
+Logs and metrics leave through a WireGuard tunnel, `wg-watchtower`, to
+watchtower's VPN (see the runbook's Telemetry section):
+
+```
+Alloy (host network) ──► wg-watchtower (10.8.0.134) ──► UDP to the proxy ──► 10.8.0.1: Loki :3100, Mimir :8080
+```
+
+- **Split, so the VM's own traffic never moves.** The tunnel routes
+  10.8.0.0/24 and nothing else. A full tunnel would send the metadata
+  server (169.254.169.254) to the proxy and take the VM's credentials,
+  image pulls and DNS-01 down with it, so `vm/bootstrap.sh` refuses any
+  config that would route more, or that carries hooks.
+- **Outbound only.** The VM dials the proxy; replies come back on the
+  established connection (the keepalive keeps the conntrack entry alive),
+  so no port opens in the VPC firewall. nftables has no rule of its own
+  for the tunnel: traffic arriving on it meets the same input rules as the
+  internet.
+- **Write only.** At the other end, watchtower lets this peer reach only
+  its ingest listeners and write paths, in the tenant `jasonmross`.
+- **Loopback listeners.** Caddy's metrics (`:2020`) are on the host's
+  loopback in either Caddy mode: bound there on the host network, published
+  as `127.0.0.1:2020` from the bridge. Alloy's UI is `127.0.0.1:12345`.
+  Caddy's admin API (`:2019`) is on loopback and never published.
+
 ## Admin access
 
 There is no public SSH. `make ssh` runs
