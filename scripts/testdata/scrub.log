@@ -8,7 +8,7 @@ keep:07 Set-Cookie: session=fakeLEAK05; Path=/; HttpOnly
 keep:08 {"user":"x","password":"fakeLEAK06","api_key":"fakeLEAK07"}
 keep:09 login password=fakeLEAK08 user=bob
 keep:10 contact bob@example.com or alice.smith+tag@mail.example.org
-keep:11 sshd[123]: Accepted publickey for jason_ross841_gmail_com from 198.51.100.7
+keep:11 sshd[123]: Accepted publickey for sam_sample_gmail_com from 198.51.100.7
 keep:12 sudo: sa_1234567890123 : TTY=pts/0 ; COMMAND=/bin/true
 keep:13 card 4111111111111111 and 5500-0000-0000-0004 and 378282246310005
 keep:14 cipher 3f2504e0-4f89-41d3-9a0c-0305e82c3301 for user 7c9e6679-7425-40de-944b-e07fc1f90ae7
@@ -60,8 +60,11 @@ keep:70 kernel: nft-drop-in: IN=eth0 OUT= MAC=42:01:0a:0a:00:02:42:01:0a:0a:00:0
 keep:71 wg-quick[812]: [#] ip -4 address add 10.8.0.134/32 dev wg-watchtower
 keep:72 GET /posts/ HTTP/1.1 Referer: https://fakeLEAK72.example.org/page
 keep:73 {"level":"error","ts":1793018977.5,"logger":"http.handlers.waf","msg":"[client \"192.0.2.73\"] Coraza: Warning. XSS Filter - Category 1: Script Tag Vector [file \"@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf\"] [line \"5226\"] [id \"941110\"] [rev \"\"] [msg \"XSS Filter - Category 1: Script Tag Vector\"] [data \"Matched Data: <script> found within REQUEST_HEADERS:Referer: https://fakeLEAK73.example.org/?q=<script>\"] [severity \"critical\"] [ver \"OWASP_CRS/4.25.0\"] [maturity \"0\"] [accuracy \"0\"] [tag \"attack-xss\"] [hostname \"10.89.10.3\"] [uri \"/\"] [unique_id \"aB3dE5fG7hJ9kL1m\"]"}
+keep:74 {"level":"info","ts":1793018978.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.74","remote_port":"40312","client_ip":"203.0.113.74","proto":"HTTP/1.1","method":"GET","host":"blog.jasonmross.dev","uri":"/","headers":{"Referer":["https://shop.example.org/list?tags[]=fakeLEAK74&page=2"],"User-Agent":["Mozilla/5.0"]}},"bytes_read":0,"user_id":"","duration":0.001,"size":5120,"status":200,"resp_headers":{}}
+keep:75 {"level":"info","ts":1793018978.2,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.75","headers":{"Referer":"https://q.example.org/?q=say \"fakeLEAK75\" here"}},"status":200}
+keep:76 {"level":"error","ts":1793018978.3,"logger":"http.log.error.log0","msg":"dial tcp 10.89.10.2:8080: connect: connection refused","request":{"remote_ip":"198.51.100.76","remote_port":"49940","client_ip":"198.51.100.76","proto":"HTTP/2.0","method":"GET","host":"blog.jasonmross.dev","uri":"/posts/","headers":{"User-Agent":["curl/8.18.0"],"Accept":["*/*"],"Referer":["https://fakeLEAK76.example.org/"]}},"duration":0.0004,"status":502,"err_id":"a1b2c3d4e","err_trace":"reverseproxy.statusError (reverseproxy.go:1390)"}
 same:80 wg-quick[812]: [#] ip link set mtu 1380 up dev wg-watchtower
-same:81 blog-bootstrap[2210]: [blog-bootstrap] watchtower tunnel or Alloy changed -- restarting them
+same:81 blog-bootstrap[2210]: [blog-bootstrap] the watchtower tunnel or Alloy changed -- restarting Alloy
 same:82 podman[3120]: 2026-10-26 05:00:12.345678901 +0000 UTC m=+0.123456789 container health_status 7d3f8a1b2c4e (image=us-east1-docker.pkg.dev/dev-blog-494815/blog/blog:prod, name=blog, health_status=healthy)
 same:83 ts=2026-10-26T05:00:13.123Z level=info msg="finished node evaluation" controller_path=/ controller_id="" node_id=loki.write.watchtower duration=1.2ms
 same:84 dnf5-automatic[1500]: Upgraded: podman-5:5.6.0-1.el10_1.x86_64

@@ -105,10 +105,12 @@ loki.process "scrub" {
 	}
 
 	// A visitor's Referer names the page they came from: whole, as a JSON
-	// field (Caddy's access log), then as a header line. Visitor IPs go by
-	// the IP rules below.
+	// field (Caddy's access and error logs), then as a header line. The JSON
+	// form reads the value as JSON strings, so a "]" or an escaped quote in
+	// the URL (?tags[]=...) doesn't end it early. Visitor IPs go by the IP
+	// rules below.
 	stage.replace {
-		expression = `(?i)"referr?er"\s*:\s*(\[[^\]]*\]|"[^"]*")`
+		expression = `(?i)"referr?er"\s*:\s*(\[\s*(?:"(?:[^"\\]|\\.)*"\s*,?\s*)*\]|"(?:[^"\\]|\\.)*")`
 		replace    = "[REDACTED-REFERER]"
 	}
 
