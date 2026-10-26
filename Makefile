@@ -35,12 +35,28 @@ dev: ## Build and run the site locally behind the WAF (podman compose)
 .PHONY: check
 check: ## Build, vet and test the Pulumi program; syntax-check and lint the shell scripts
 	cd infra && go build -o blog-infra . && go vet ./... && go test ./...
-	bash -n vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh
+	bash -n vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh scripts/check-alloy-scrub.sh
 	@# if/else, not `a && b || c`: the latter reports "not installed" and exits 0
 	@# when shellcheck runs and FINDS something, so CI would never fail on it.
 	@if command -v shellcheck >/dev/null; then \
-		shellcheck -S warning vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh; \
+		shellcheck -S warning vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh scripts/check-alloy-scrub.sh; \
 	else echo "shellcheck not installed -- skipped"; fi
+
+# The Alloy config is a template: fmt checks it as written, validate checks it
+# rendered with the same variable list vm/bootstrap.sh uses, and any ${...}
+# still in the render is a variable missing from that list. Then the scrub
+# rules run over scripts/testdata/scrub.log. Needs alloy (v1.21.2), jq and
+# envsubst; CI installs alloy in the infra-check job.
+ALLOY_TMPL := vm/config/config.alloy.tmpl
+
+.PHONY: check-alloy
+check-alloy: ## Format-check and validate the Alloy config; run its scrub rules over the fixture
+	alloy fmt --test $(ALLOY_TMPL)
+	@tmp=$$(mktemp --suffix=.alloy) && trap 'rm -f "$$tmp"' EXIT && \
+		DOMAIN=blog.example.org HEALTH_PATH=/ envsubst '$${DOMAIN} $${HEALTH_PATH}' < $(ALLOY_TMPL) > "$$tmp" && \
+		if grep -n '\$${' "$$tmp"; then echo "$(ALLOY_TMPL): a variable vm/bootstrap.sh does not substitute (above)" >&2; exit 1; fi && \
+		alloy validate "$$tmp" && echo "alloy validate: $(ALLOY_TMPL) ok"
+	scripts/check-alloy-scrub.sh
 
 .PHONY: preview
 preview: check ## Show what `pulumi up` would change

@@ -211,9 +211,29 @@ jobs:
           command -v shellcheck && exit 0
           SUDO=""; [[ $(id -u) -ne 0 ]] && SUDO=sudo
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq shellcheck
+      # The Alloy release watchtower's contract pins, checked against the
+      # sha256 in the release's SHA256SUMS; jq and envsubst for check-alloy.
+      - name: Install Alloy
+        env:
+          ALLOY_VERSION: "1.21.2"
+          ALLOY_SHA256: 1eadb46a0640127184250173acd9b4145e4d590680db37ffe66fa8afd07f04cf
+        run: |
+          SUDO=""; [[ $(id -u) -ne 0 ]] && SUDO=sudo
+          if ! command -v jq >/dev/null || ! command -v unzip >/dev/null || ! command -v envsubst >/dev/null; then
+            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq jq unzip gettext-base
+          fi
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/alloy.zip" \
+            "https://github.com/grafana/alloy/releases/download/v${ALLOY_VERSION}/alloy-linux-amd64.zip"
+          echo "${ALLOY_SHA256}  $RUNNER_TEMP/alloy.zip" | sha256sum -c --quiet -
+          unzip -q -o "$RUNNER_TEMP/alloy.zip" -d "$RUNNER_TEMP/alloy"
+          $SUDO install -m 0755 "$RUNNER_TEMP/alloy/alloy-linux-amd64" /usr/local/bin/alloy
+          alloy --version
       # go build + vet + the mock-runtime invariant tests; bash -n and
       # shellcheck over the VM and bootstrap scripts.
       - run: make check
+      # alloy fmt and validate over vm/config/config.alloy.tmpl, and its scrub
+      # rules over scripts/testdata/scrub.log: nothing on watchtower scrubs.
+      - run: make check-alloy
 
   # Pull requests: show what merging would change. Same-repo PRs only -- Gitea
   # withholds secrets from forks, and this instance has no outside forks.
