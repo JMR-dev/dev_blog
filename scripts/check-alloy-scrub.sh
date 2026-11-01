@@ -2,8 +2,8 @@
 # Runs a client config's scrub rules over a fixture with Alloy itself, and
 # checks what would ship. Nothing on watchtower scrubs, so these rules are the
 # only thing between a service's logs and storage (docs/client-telemetry.md in
-# watchtower-observability-stack, whose copy this is; only the defaults
-# differ).
+# watchtower-observability-stack, whose copy this is; only the defaults and the
+# Caddy fixture differ).
 #
 #   scripts/check-alloy-scrub.sh [config] [fixture]
 #   (defaults: vm/config/config.alloy.tmpl, scripts/testdata/scrub.log)
@@ -17,6 +17,14 @@
 # and nothing that comes out may match a line of <fixture>.forbidden (grep
 # -E). The last line mustn't be a drop: the run ends when it comes out.
 #
+# A Caddy pipeline's JSON check runs only on container="caddy", and a tagged
+# line isn't JSON. So <fixture minus .log>.caddy.log, if there is one, runs too,
+# under that label, with each line's tag somewhere inside it instead:
+#   keep:c<n>  comes out
+#   drop:c<n>  doesn't come out
+# The same rule holds for its last line. (This file is the one addition to
+# watchtower's copy.)
+#
 # SCRUB_SHOW=1 prints what came out. Needs alloy and jq. `make check-alloy`
 # runs it.
 
@@ -26,6 +34,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 config="${1:-${repo_root}/vm/config/config.alloy.tmpl}"
 fixture="${2:-${repo_root}/scripts/testdata/scrub.log}"
 forbidden="${fixture%.log}.forbidden"
+caddy="${fixture%.log}.caddy.log"
 port="${ALLOY_TEST_PORT:-12398}"
 
 fail() { echo "scrub check: $*" >&2; exit 1; }
@@ -44,10 +53,22 @@ name="$(sed -n 's/^loki\.process "\([^"]*\)" {$/\1/p' <<<"$block" | head -1)"
 cp "$fixture" "${work}/in.log"
 last="$(tail -n 1 "$fixture" | cut -d' ' -f1)"
 [[ "$last" == keep:* || "$last" == same:* ]] || fail "the fixture's last line must be keep: or same:"
+caddy_last=
+total="$(wc -l <"$fixture")"
+if [[ -f "$caddy" ]]; then
+  cp "$caddy" "${work}/caddy.log"
+  caddy_last="$(tail -n 1 "$caddy" | grep -oE 'keep:c[0-9]+' | head -1 || true)"
+  [[ -n "$caddy_last" ]] || fail "the last line of $(basename "$caddy") must be a keep:c<n>"
+  total=$((total + $(wc -l <"$caddy")))
+fi
 {
   printf 'logging {\n\tlevel  = "info"\n\tformat = "json"\n}\n\n'
   printf 'loki.source.file "fixture" {\n\ttargets    = [{"__path__" = "%s", "service" = "fixture", "job" = "fixture"}]\n' "${work}/in.log"
   printf '\tforward_to = [loki.process.%s.receiver]\n}\n\n' "$name"
+  if [[ -n "$caddy_last" ]]; then
+    printf 'loki.source.file "caddy" {\n\ttargets    = [{"__path__" = "%s", "service" = "fixture", "job" = "fixture", "container" = "caddy"}]\n' "${work}/caddy.log"
+    printf '\tforward_to = [loki.process.%s.receiver]\n}\n\n' "$name"
+  fi
   sed -E 's/^([[:space:]]*forward_to[[:space:]]*=[[:space:]]*)\[.*\]$/\1[loki.echo.out.receiver]/' <<<"$block"
   printf '\nloki.echo "out" { }\n'
 } >"${work}/harness.alloy"
@@ -59,11 +80,12 @@ pid=$!
 out="${work}/out.txt"
 for _ in $(seq 60); do
   jq -r 'select(.component_id == "loki.echo.out") | .entry' "${work}/alloy.log" 2>/dev/null >"$out" || true
-  grep -q "^${last} " "$out" && break
+  grep -q "^${last} " "$out" && { [[ -z "$caddy_last" ]] || grep -qF "$caddy_last" "$out"; } && break
   kill -0 "$pid" 2>/dev/null || { tail -20 "${work}/alloy.log" >&2; fail "alloy exited"; }
   sleep 0.5
 done
 grep -q "^${last} " "$out" || { tail -20 "${work}/alloy.log" >&2; fail "${last} never came out"; }
+[[ -z "$caddy_last" ]] || grep -qF "$caddy_last" "$out" || { tail -20 "${work}/alloy.log" >&2; fail "${caddy_last} never came out"; }
 
 [[ -z "${SCRUB_SHOW:-}" ]] || cat "$out"
 bad=0
@@ -75,6 +97,16 @@ while read -r tag line; do
     *) fail "untagged fixture line: ${tag} ${line}" ;;
   esac
 done <"$fixture"
+if [[ -n "$caddy_last" ]]; then
+  while IFS= read -r line; do
+    tag="$(grep -oE '(keep|drop):c[0-9]+' <<<"$line" | head -1 || true)"
+    case "$tag" in
+      keep:*) grep -qF "$tag" "$out" || { echo "missing: ${tag}"; bad=1; } ;;
+      drop:*) ! grep -qF "$tag" "$out" || { echo "shipped: ${tag}"; bad=1; } ;;
+      *) fail "untagged line in $(basename "$caddy"): ${line}" ;;
+    esac
+  done <"$caddy"
+fi
 while IFS= read -r pattern; do
   [[ -z "$pattern" ]] && continue
   if hits="$(grep -E -- "$pattern" "$out")"; then
@@ -83,4 +115,4 @@ while IFS= read -r pattern; do
   fi
 done <"$forbidden"
 [[ "$bad" -eq 0 ]] || fail "$(basename "$config") ships what it shouldn't (above)"
-echo "scrub check: $(basename "$config"): $(wc -l <"$out") of $(wc -l <"$fixture") lines out, all scrubbed"
+echo "scrub check: $(basename "$config"): $(wc -l <"$out") of ${total} lines out, all scrubbed"

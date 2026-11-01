@@ -119,6 +119,71 @@ loki.process "scrub" {
 		replace    = "[REDACTED-REFERER]"
 	}
 
+	// The rules below read a value the way it is written, where the example's
+	// stop too early or want a string. They run before it, so all it finds is
+	// their markers.
+	//
+	// Caddy logs every header as "Name":["value"] and redacts only Cookie,
+	// Set-Cookie, Authorization and Proxy-Authorization, so these take any name
+	// that holds one of those (X-Authorization) or a secret's (X-Api-Key,
+	// X-Session-Id), as a JSON string, array, flat object or number. A "]" or an
+	// escaped quote doesn't end a value early.
+	stage.replace {
+		expression = `(?i)"[\w.-]*authorization[\w.-]*"\s*:\s*(\[\s*(?:"(?:[^"\\]|\\.)*"\s*,?\s*)*\]|\[[^\]]*\]|"(?:[^"\\]|\\.)*")`
+		replace    = "[REDACTED-CREDENTIAL]"
+	}
+
+	stage.replace {
+		expression = `(?i)"[\w.-]*cookie[\w.-]*"\s*:\s*(\[\s*(?:"(?:[^"\\]|\\.)*"\s*,?\s*)*\]|\[[^\]]*\]|\{\s*(?:"(?:[^"\\]|\\.)*"\s*:\s*"(?:[^"\\]|\\.)*"\s*,?\s*)*\}|\{[^{}]*\}|"(?:[^"\\]|\\.)*")`
+		replace    = "[REDACTED-COOKIE]"
+	}
+
+	stage.replace {
+		expression = `(?i)"[\w.-]*(?:password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key|preshared[_-]?key|session|credential)[\w.-]*"\s*:\s*(\[\s*(?:"(?:[^"\\]|\\.)*"\s*,?\s*)*\]|\[[^\]]*\]|\{\s*(?:"(?:[^"\\]|\\.)*"\s*:\s*"(?:[^"\\]|\\.)*"\s*,?\s*)*\}|\{[^{}]*\}|"(?:[^"\\]|\\.)*"|-?\d[\d.eE+-]*)`
+		replace    = "[REDACTED-SECRET]"
+	}
+
+	// The same inside a JSON string: a log line that quotes a JSON body, with
+	// \" for its quotes.
+	stage.replace {
+		expression = `(?i)\\"[\w.-]*(?:password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key|preshared[_-]?key|session|credential|authorization|cookie)[\w.-]*\\"\s*:\s*(\[\s*(?:\\"(?:\\\\\\"|\\\\|\\[^"\\]|[^"\\])*\\"\s*,?\s*)*\]|\\"(?:\\\\\\"|\\\\|\\[^"\\]|[^"\\])*\\"|-?\d[\d.eE+-]*)`
+		replace    = "[REDACTED-SECRET]"
+	}
+
+	// A quoted key=value or key: value, quotes escaped inside it.
+	stage.replace {
+		expression = `(?i)[\w.-]*(?:password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key|preshared[_-]?key|session|credential)[\w.-]*\s*[=:]\s*"((?:[^"\\]|\\.)*)"`
+		replace    = "[REDACTED-SECRET]"
+	}
+
+	stage.replace {
+		expression = `(?i)[\w.-]*(?:password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key|preshared[_-]?key|session|credential)[\w.-]*\s*[=:]\s*'((?:[^'\\]|\\.)*)'`
+		replace    = "[REDACTED-SECRET]"
+	}
+
+	// A bare one goes up to the next blank, & or closing quote, so a comma or a
+	// semicolon in it (?password=a,b;c in a uri) doesn't ship the rest. \" is
+	// part of the value, as in a JSON string. Not a [: that's a marker.
+	stage.replace {
+		expression = `(?i)[\w.-]*(?:password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key|preshared[_-]?key|session|credential)[\w.-]*\s*[=:]\s*((?:\\.|[^\s&"'\\\[])(?:\\.|[^\s&"\\])*)`
+		replace    = "[REDACTED-SECRET]"
+	}
+
+	stage.replace {
+		expression = `(?i)[\w.-]*authorization\s*[:=]\s*([^\r\n]+)`
+		replace    = "[REDACTED-CREDENTIAL]"
+	}
+
+	// wg's errors quote the line or key they choke on. vm/bootstrap.sh's
+	// check_peer refuses those configs, so these are the second layer: this is
+	// a private key, or close to one.
+	stage.replace {
+		expression = `(?:Key is not the correct length or format|Line unrecognized): \x60(.+)`
+		replace    = "[REDACTED-SECRET]"
+	}
+
+	// ---- The example's, from here on ----
+
 	// Coraza's audit records hold whole requests: headers, cookies, bodies.
 	stage.drop {
 		expression          = `"transaction"\s*:\s*\{`

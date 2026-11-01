@@ -30,3 +30,10 @@ pat_example
 10\.10\.0\.
 10\.8\.0\.
 owner@
+fake\]LEAK
+8675309
+31415926
+2\.71828
+42424242
+"[A-Za-z-]*([Cc]ookie|[Aa]uthorization)": *\[?"
+\\"[A-Za-z_-]*([Cc]ookie|[Pp]assword|[Tt]oken|[Ss]ession|[Kk]ey)\\": *(\[\\"|\\")

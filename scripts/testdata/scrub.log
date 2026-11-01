@@ -70,3 +70,26 @@ same:83 ts=2026-10-26T05:00:13.123Z level=info msg="finished node evaluation" co
 same:84 dnf5-automatic[1500]: Upgraded: podman-5:5.6.0-1.el10_1.x86_64
 same:85 {"level":"info","ts":1793018976.2,"logger":"tls","msg":"finished cleaning storage units"}
 same:86 Referrer-Policy: strict-origin-when-cross-origin
+keep:90 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"],"X-Auth-Token":["fakeLEAK90"],"X-Api-Key":["fakeLEAK91"],"X-Csrf-Token":["fakeLEAK92"],"X-Session-Id":["fakeLEAK93","fakeLEAK94"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:91 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"],"X-Authorization":["Basic fakeLEAK95"],"X-Forwarded-Authorization":["Basic fakeLEAK96"],"X-Forwarded-Cookie":["sid=fakeLEAK97"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:92 {"X-Authorization":"Basic fakeLEAK98","x-goog-authorization":"ab\"fakeLEAK99"}
+keep:93 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"],"X-Api-Key":["fake]LEAK100","a\"]fakeLEAK101"],"Cookie":["a=\"]fakeLEAK102"],"Authorization":["Basic \"]fakeLEAK103"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:94 {"password":"ab\"fakeLEAK104","cookie":"ab\"fakeLEAK105","cookies":{"a}b":"fakeLEAK106}fakeLEAK107"}}
+keep:95 {"password":8675309,"token":-31415926,"session_ttl":271828.0,"secret":["fakeLEAK108"],"credentials":[1,"fakeLEAK109",2]}
+keep:96 {"session":{"id":"fakeLEAK110","user":"fakeLEAK111"}}
+keep:97 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/?password=fakeLEAK112,fakeLEAK113;fakeLEAK114(fakeLEAK115&token=fakeLEAK116;fakeLEAK117&page=2","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:98 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/?password=\"fakeLEAK118\"&secret='fakeLEAK119'&page=2","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:99 login password=fakeLEAK120,fakeLEAK121 user=bob
+keep:100 token=fakeLEAK122;fakeLEAK123 (retrying)
+keep:101 password=(fakeLEAK124) session: <fakeLEAK125>
+keep:102 login password="ab\"fakeLEAK126" user=bob
+keep:103 {"level":"error","msg":"bad body {\"password\":\"fakeLEAK127\",\"api_key\":\"ab\\\"fakeLEAK128\",\"session\":42424242,\"token\":[\"fakeLEAK129\"],\"Cookie\":\"fakeLEAK130\"} rejected"}
+keep:104 wg-quick[812]: Key is not the correct length or format: `fakeLEAK131AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+keep:105 wg-quick[812]: Line unrecognized: `Secre=fakeLEAK132'
+keep:106 wg-quick[812]: Line unrecognized: `Shared=fakeLEAK133'
+keep:107 PrivateKey = fakeLEAK134 PresharedKey = fakeLEAK135
+keep:108 {"preshared_key":"fakeLEAK136"}
+keep:109 X_Authorization: Basic fakeLEAK137
+keep:112 login secret='ab\'fakeLEAK138' user=bob
+same:110 wg-quick[812]: Configuration parsing error
+same:111 {"level":"info","logger":"http.log.access.log0","request":{"method":"GET","uri":"/?page=2&q=a,b;c(d","headers":{"Accept":["*/*"]}},"status":200}
