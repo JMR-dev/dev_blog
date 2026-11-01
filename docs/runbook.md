@@ -209,9 +209,10 @@ contract; this deployment implements it:
 
 - **Scrub rules:** edit `vm/config/config.alloy.tmpl` between the
   `// scrub:` markers, add made-up lines to `scripts/testdata/scrub.log`
-  (`keep:`, `same:` or `drop:`) and what must never come out to
-  `scrub.forbidden`, then `make check-alloy` (needs `alloy` v1.21.2 and
-  `jq`). `SCRUB_SHOW=1 scripts/check-alloy-scrub.sh` prints what would ship.
+  (`keep:`, `same:` or `drop:`; `scrub.caddy.log` for what only Caddy's JSON
+  check decides) and what must never come out to `scrub.forbidden`, then
+  `make check-alloy` (needs `alloy` v1.21.2 and `jq`).
+  `SCRUB_SHOW=1 scripts/check-alloy-scrub.sh` prints what would ship.
 - **Off:** remove `blog:watchtowerPeerSecret` from `infra/Pulumi.prod.yaml`
   and merge. The sync stops the tunnel and Alloy and removes their config.
   A missing, empty or refused secret does the same, with a warning in
@@ -241,13 +242,14 @@ Over the first hour of real traffic, each of these must find nothing:
 {host="blog-vm"} |~ "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[a-z]{2,}"
 {host="blog-vm"} |= "eyJ"
 {host="blog-vm"} |= "\"transaction\""
-{host="blog-vm"} |~ "(?i)\"(cookie|authorization)\""
+{host="blog-vm"} |~ "(?i)\"[\\w-]*(cookie|authorization)\":\\s*\\[?\""
 {host="blog-vm"} |~ "_(gmail|googlemail)_com"
 {host="blog-vm"} |~ "(?i)\"referr?er\":\\[\""
 ```
 
 A hit means a rule is missing: add the line's shape to the fixture, fix the
-rule, and merge before anything else.
+rule, and merge before anything else. (A redacted header keeps its name, so
+the cookie and authorization query looks for a quoted value after it.)
 
 **Memory.** An e2-micro has 1 GB. If `MemAvailable` dips under about 300 MB
 with Alloy running, set `blog:machineType: e2-small` (in place: one stop
