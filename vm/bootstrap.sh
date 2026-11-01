@@ -498,16 +498,14 @@ render_all() {
     log "rendering configuration"
     mkdir -p /etc/blog /etc/caddy "${RENDER_DIR}"
 
-    # First, and on its own changed flag: the tunnel and Alloy never restart
-    # the site, and don't wait for the app's secrets.
-    render_telemetry
-
     if ! load_secrets; then
         # Deliberately NOT a failure: on first boot the secrets may not be
         # readable yet (IAM propagation). Rendering an app config with empty
         # secrets would be far worse than doing nothing; the next sync retries.
         warn "required secrets unavailable -- skipping config render (will retry on the next sync)"
         unset "${SECRET_ENV_NAMES[@]}"
+        # Telemetry doesn't wait for the app's secrets.
+        render_telemetry
         return 0
     fi
 
@@ -611,6 +609,13 @@ render_all() {
     else
         log "configuration unchanged"
     fi
+
+    # Last, and on its own changed flag: the tunnel and Alloy never restart the
+    # site. Their slow first deploy (dnf, a 213 MiB image pull) comes after the
+    # site's restart, because that flag lives only in this run: if the sync's
+    # TimeoutStartSec killed us between rendering and restarting, the retry
+    # would see nothing changed and Caddy would stay on its old config.
+    render_telemetry
 }
 
 # ---------------------------------------------------------------------------
@@ -641,8 +646,9 @@ setup_caddy_logs() {
 # this VM's service account may read.
 #
 # Both have a changed flag of their own and restart only each other, never the
-# site. No peer (the metadata unset, the secret missing, empty or refused) is a
-# warning, not a failure: the tunnel and Alloy stop and their config goes.
+# site, and render after it. No peer (the metadata unset, the secret missing,
+# empty or refused) is a warning, not a failure: the tunnel and Alloy stop and
+# their config goes.
 #
 # The peer config holds this VM's WireGuard private key, and this script's
 # output reaches the serial console and Cloud Logging at boot. So the config
@@ -658,6 +664,9 @@ TELEMETRY_ON=0
 # purpose) and there is nothing left to stop.
 telemetry_off() {
     local was_on=0
+    # A run that died half-way can leave the raw config here, private key and
+    # all.
+    rm -f /etc/wireguard/.peer-*
     [[ -f "${WG_CONF}" || -f "${RENDER_DIR}/alloy.container" ]] && was_on=1
     if [[ "${2:-}" == quiet ]] && (( ! was_on )); then
         log "watchtower telemetry off: $1"
@@ -665,6 +674,9 @@ telemetry_off() {
     fi
     warn "watchtower telemetry off: $1"
     systemctl stop alloy.service >/dev/null 2>&1 || true
+    # Its oneshot unit would linger as not-found until a reboot. Stopping it
+    # leaves the volume, and with it the journal position, on disk.
+    systemctl stop alloy-data-volume.service >/dev/null 2>&1 || true
     systemctl disable --now "wg-quick@${WG_IFACE}.service" >/dev/null 2>&1 || true
     rm -f "${WG_CONF}" "${ALLOY_CONF}" "${RENDER_DIR}/alloy.container" "${RENDER_DIR}/alloy-data.volume"
     if (( was_on )); then
