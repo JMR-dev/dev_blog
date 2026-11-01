@@ -676,52 +676,90 @@ telemetry_off() {
 # writing nothing, on a config to refuse. Prints nothing from either file.
 #
 # Watchtower's deploy pins all of this before it publishes, but the file runs
-# here as root (wg-quick runs its hooks), so check again. Refuse it unless it
-# has one [Interface] with one Address, a /32 in the agent half
-# (10.8.0.128/25), and exactly one [Peer] with an Endpoint and AllowedIPs
-# exactly 10.8.0.0/24: a wider route, or an address over the metadata
-# server's, would send 169.254.169.254 into the tunnel and take the VM's
-# credentials, image pulls and DNS-01 with it. Refuse any PreUp, PostUp,
-# PreDown, PostDown (commands wg-quick runs), Table, FwMark or SaveConfig.
-# Then drop DNS (the tunnel is split; the host keeps its own resolver) and add
-# MTU = 1380 and PersistentKeepalive = 25 if missing (watchtower sets both).
+# here as root (wg-quick runs its hooks), so check again. A wider route, or an
+# address over the metadata server's, would send 169.254.169.254 into the
+# tunnel and take the VM's credentials, image pulls and DNS-01 with it.
 #
-# wg-quick and wg read keys case-insensitively and cut a line at "#", and
-# so do these patterns.
+# wg-quick and wg don't read a line as written: wg deletes every blank in it
+# (`Allowed IPs` is AllowedIPs, `[ Peer ]` is [Peer]) and bash's read drops NUL
+# bytes (`Post\0Up` is PostUp). So nothing but printable ASCII, tabs and
+# newlines gets in, each line is judged the way wg reads it (cut at "#", blanks
+# gone, keys in any case), and the output is written afresh from the values
+# checked, so nothing else in the file reaches wg-quick:
+#   - one [Interface], then one [Peer];
+#   - PrivateKey, PublicKey and an optional PresharedKey, each a well-formed
+#     key: wg prints a bad one whole in its error, and that goes to the journal;
+#   - Address, a /32 in the agent half (10.8.0.128/25);
+#   - AllowedIPs, exactly 10.8.0.0/24, and an Endpoint;
+#   - MTU and PersistentKeepalive, which watchtower sets: 1380 and 25 if missing;
+#   - DNS is dropped: the tunnel is split, and the host keeps its own resolver.
+# Any other key is refused: PreUp, PostUp, PreDown, PostDown (commands wg-quick
+# runs), Table, FwMark, SaveConfig, and whatever else may come along.
 check_peer() {
-    local src="$1" dst="$2" clean n
-    local -r ws='[[:space:]]*' end='[[:space:]]*(#.*)?$'
-    clean=$(mktemp /etc/wireguard/.peer-clean.XXXXXX)
-    tr -d '\r' < "${src}" > "${clean}"
-
-    n=$(grep -ciE "^${ws}\[interface\]${end}" "${clean}" || true)
-    [[ "${n}" == 1 ]] || { rm -f "${clean}"; return 1; }
-    n=$(grep -ciE "^${ws}\[peer\]${end}" "${clean}" || true)
-    [[ "${n}" == 1 ]] || { rm -f "${clean}"; return 1; }
-    n=$(grep -ciE "^${ws}endpoint${ws}=" "${clean}" || true)
-    [[ "${n}" == 1 ]] || { rm -f "${clean}"; return 1; }
-    n=$(grep -ciE "^${ws}allowedips${ws}=" "${clean}" || true)
-    [[ "${n}" == 1 ]] || { rm -f "${clean}"; return 1; }
-    n=$(grep -ciE "^${ws}address${ws}=" "${clean}" || true)
-    [[ "${n}" == 1 ]] || { rm -f "${clean}"; return 1; }
-    if ! grep -qiE "^${ws}allowedips${ws}=${ws}10\.8\.0\.0/24${end}" "${clean}" \
-        || ! grep -qiE "^${ws}address${ws}=${ws}10\.8\.0\.(12[89]|1[3-9][0-9]|2[0-4][0-9]|25[0-4])/32${end}" "${clean}" \
-        || grep -qiE "^${ws}(preup|postup|predown|postdown|table|fwmark|saveconfig)${ws}=" "${clean}"; then
-        rm -f "${clean}"
-        return 1
-    fi
-
-    local need_mtu=1 need_keepalive=1
-    grep -qiE "^${ws}mtu${ws}=" "${clean}" && need_mtu=0
-    grep -qiE "^${ws}persistentkeepalive${ws}=" "${clean}" && need_keepalive=0
-    awk -v need_mtu="${need_mtu}" -v need_keepalive="${need_keepalive}" '
-        { key = tolower($0); sub(/^[ \t]+/, "", key) }
-        key ~ /^dns[ \t]*=/ { next }
-        { print }
-        key ~ /^\[interface\]/ && need_mtu == 1 { print "MTU = 1380" }
-        key ~ /^\[peer\]/ && need_keepalive == 1 { print "PersistentKeepalive = 25" }
-    ' "${clean}" > "${dst}"
-    rm -f "${clean}"
+    local src="$1" dst="$2"
+    [[ $(LC_ALL=C tr -d '\t\n\040-\176' < "${src}" | wc -c) -eq 0 ]] || return 1
+    # END writes the file, so a refusal writes nothing. A key decodes to 32
+    # bytes, so its 43rd character has its last two bits clear; wg checks that.
+    LC_ALL=C awk '
+        function refuse() { bad = 1; exit 1 }
+        function is_key(v) {
+            return length(v) == 44 && v ~ /^[A-Za-z0-9+\/]+[AEIMQUYcgkosw048]=$/
+        }
+        {
+            line = $0
+            sub(/#.*/, "", line)
+            gsub(/[ \t]/, "", line)
+            if (line == "") next
+            lower = tolower(line)
+            if (lower == "[interface]") {
+                if (section != "") refuse()
+                section = "interface"
+                next
+            }
+            if (lower == "[peer]") {
+                if (section != "interface") refuse()
+                section = "peer"
+                next
+            }
+            eq = index(line, "=")
+            if (eq < 2 || section == "") refuse()
+            key = section "/" substr(lower, 1, eq - 1)
+            value = substr(line, eq + 1)
+            if (key == "interface/dns") next
+            if (key in conf) refuse()
+            if (key == "interface/privatekey" || key == "peer/publickey" || key == "peer/presharedkey") {
+                if (!is_key(value)) refuse()
+            } else if (key == "interface/address") {
+                if (value !~ /^10\.8\.0\.(12[89]|1[3-9][0-9]|2[0-4][0-9]|25[0-4])\/32$/) refuse()
+            } else if (key == "peer/allowedips") {
+                if (value != "10.8.0.0/24") refuse()
+            } else if (key == "peer/endpoint") {
+                if (value !~ /^([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\]):[0-9]+$/) refuse()
+            } else if (key == "interface/mtu" || key == "peer/persistentkeepalive") {
+                if (value !~ /^[0-9]+$/) refuse()
+            } else {
+                refuse()
+            }
+            conf[key] = value
+        }
+        END {
+            if (bad || section != "peer") exit 1
+            if (!("interface/privatekey" in conf) || !("interface/address" in conf) \
+                || !("peer/publickey" in conf) || !("peer/allowedips" in conf) \
+                || !("peer/endpoint" in conf)) exit 1
+            print "[Interface]"
+            print "PrivateKey = " conf["interface/privatekey"]
+            print "Address = " conf["interface/address"]
+            print "MTU = " (("interface/mtu" in conf) ? conf["interface/mtu"] : 1380)
+            print ""
+            print "[Peer]"
+            print "PublicKey = " conf["peer/publickey"]
+            if ("peer/presharedkey" in conf) print "PresharedKey = " conf["peer/presharedkey"]
+            print "AllowedIPs = " conf["peer/allowedips"]
+            print "PersistentKeepalive = " (("peer/persistentkeepalive" in conf) ? conf["peer/persistentkeepalive"] : 25)
+            print "Endpoint = " conf["peer/endpoint"]
+        }
+    ' "${src}" > "${dst}"
 }
 
 # Installs the tunnel config and renders Alloy, restarting either only when it
@@ -755,7 +793,7 @@ render_telemetry() {
     fi
     if ! check_peer "${raw}" "${conf}"; then
         rm -f "${raw}" "${conf}"
-        telemetry_off "the peer config in ${WATCHTOWER_PEER_SECRET} is not a split tunnel without hooks; refused"
+        telemetry_off "the peer config in ${WATCHTOWER_PEER_SECRET} failed its checks (a split tunnel, no hooks, well-formed keys); refused"
         return 0
     fi
     rm -f "${raw}"
