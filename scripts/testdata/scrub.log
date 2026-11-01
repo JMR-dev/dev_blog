@@ -14,7 +14,7 @@ keep:13 card 4111111111111111 and 5500-0000-0000-0004 and 378282246310005
 keep:14 cipher 3f2504e0-4f89-41d3-9a0c-0305e82c3301 for user 7c9e6679-7425-40de-944b-e07fc1f90ae7
 keep:15 jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJl here # nosemgrep: generic.secrets.security.detected-jwt-token.detected-jwt-token
 drop:16 {"transaction":{"client_ip":"192.0.2.66","request":{"headers":{"cookie":["x"]}}}}
-drop:17 config dump: cvv=123 ssn: 078051120
+keep:17 config dump: cvv=123 ssn: 078051120
 keep:20 env DB_PASSWORD=fakeLEAK20 POSTGRES_PASSWORD=fakeLEAK21 SMTP_PASSWORD=fakeLEAK22
 keep:21 {"db_password":"fakeLEAK23","smtp_password":"fakeLEAK24"}
 keep:22 login password="fakeLEAK25" user=bob
@@ -91,5 +91,24 @@ keep:107 PrivateKey = fakeLEAK134 PresharedKey = fakeLEAK135
 keep:108 {"preshared_key":"fakeLEAK136"}
 keep:109 X_Authorization: Basic fakeLEAK137
 keep:112 login secret='ab\'fakeLEAK138' user=bob
+keep:120 {"level":"error","logger":"http.handlers.waf","msg":"Coraza: Warning. [msg \"XSS\"] [data \"Matched Data: fakeLEAK140\"] [severity \"critical\"] [uri \"/\"] [msg_match_1 \"XSS\"] [data_match_1 \"Matched Data: fakeLEAK141\"]"}
+drop:121 {"msg":"Coraza: Warning. [data_match_1 \"Matched Data: fakeLEAK142\"]"}
+drop:122 Coraza: Warning. [data "Matched Data: fakeLEAK143"] and no severity after it
+keep:123 header was Basic fakeLEAK144Zm9vOmJhcg== rejected
+keep:124 sshd-session[2345]: Accepted publickey for root from 192.0.2.7 port 40122 ssh2: ED25519 SHA256:fakeLEAK145AbCdEfGhIjKl/+Mn0123
+keep:125 x-cookie-id: fakeLEAK146
+keep:126 Cookie2: sid=fakeLEAK147
+keep:127 login passphrase=fakeLEAK148 pass=fakeLEAK149 otp=fakeLEAK150 auth=fakeLEAK151 user=bob
+keep:128 <password>fakeLEAK152</password> <Token a="b">fakeLEAK153</Token> <pass>fakeLEAK154</pass>
+keep:129 sudo[1]: root : TTY=pts/0 ; PWD=/root ; USER=root ; COMMAND=/usr/bin/mysql --password fakeLEAK155 --token fakeLEAK156 --pass fakeLEAK157 --api-key "a fakeLEAK158"
+keep:130 {"Cmd":["app","--password","fakeLEAK159","--api-key","a fakeLEAK160"]}
+keep:131 headers=[('Cookie', 'sid=fakeLEAK161'), ('X-Api-Key', 'fakeLEAK162'), ('Authorization', 'Basic fakeLEAK163')]
+keep:132 app:fakeLEAK164@tcp(db.example.org:3306)/app and app:fakeLEAK165@unix(/run/db.sock)/app
+keep:133 host-192-0-2-205.isp.example.org and ec2-198-51-100-206.compute-1.amazonaws.com
+keep:134 GET /a?ip=2001%3Adb8%3A%3A205 HTTP/1.1
+drop:135 form password=&fakeLEAK166
+same:112 sysctl: net.ipv4.tcp_syncookies = 1
+same:113 bypass=1 compass=n passed=3 authenticated=true author=bob auth_method=publickey otp_enabled=true
+same:114 tests pass: 5 auth: ok pam_unix(sudo:auth): auth could not identify a user
 same:110 wg-quick[812]: Configuration parsing error
 same:111 {"level":"info","logger":"http.log.access.log0","request":{"method":"GET","uri":"/?page=2&q=a,b;c(d","headers":{"Accept":["*/*"]}},"status":200}

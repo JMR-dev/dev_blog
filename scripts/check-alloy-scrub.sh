@@ -2,8 +2,7 @@
 # Runs a client config's scrub rules over a fixture with Alloy itself, and
 # checks what would ship. Nothing on watchtower scrubs, so these rules are the
 # only thing between a service's logs and storage (docs/client-telemetry.md in
-# watchtower-observability-stack, whose copy this is; only the defaults and the
-# Caddy fixture differ).
+# watchtower-observability-stack, whose copy this is; only the defaults differ).
 #
 #   scripts/check-alloy-scrub.sh [config] [fixture]
 #   (defaults: vm/config/config.alloy.tmpl, scripts/testdata/scrub.log)
@@ -22,8 +21,7 @@
 # under that label, with each line's tag somewhere inside it instead:
 #   keep:c<n>  comes out
 #   drop:c<n>  doesn't come out
-# The same rule holds for its last line. (This file is the one addition to
-# watchtower's copy.)
+# The same rule holds for its last line.
 #
 # SCRUB_SHOW=1 prints what came out. Needs alloy and jq. `make check-alloy`
 # runs it.
@@ -98,12 +96,13 @@ while read -r tag line; do
   esac
 done <"$fixture"
 if [[ -n "$caddy_last" ]]; then
+  caddy_name="$(basename "$caddy")"
   while IFS= read -r line; do
     tag="$(grep -oE '(keep|drop):c[0-9]+' <<<"$line" | head -1 || true)"
     case "$tag" in
       keep:*) grep -qF "$tag" "$out" || { echo "missing: ${tag}"; bad=1; } ;;
       drop:*) ! grep -qF "$tag" "$out" || { echo "shipped: ${tag}"; bad=1; } ;;
-      *) fail "untagged line in $(basename "$caddy"): ${line}" ;;
+      *) fail "untagged line in ${caddy_name}: ${line}" ;;
     esac
   done <"$caddy"
 fi

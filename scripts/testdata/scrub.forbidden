@@ -19,6 +19,7 @@ sa_1234567890123
 eyJhbGci
 "transaction"
 078051120
+cvv=123
 00:1a:2b
 search\.example\.net
 Matched Data
@@ -35,5 +36,8 @@ fake\]LEAK
 31415926
 2\.71828
 42424242
+192-0-2-
+198-51-100-
+2001%3A
 "[A-Za-z-]*([Cc]ookie|[Aa]uthorization)": *\[?"
 \\"[A-Za-z_-]*([Cc]ookie|[Pp]assword|[Tt]oken|[Ss]ession|[Kk]ey)\\": *(\[\\"|\\")

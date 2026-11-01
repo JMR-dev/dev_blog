@@ -207,8 +207,11 @@ contract; this deployment implements it:
 
 ### Changing it
 
-- **Scrub rules:** edit `vm/config/config.alloy.tmpl` between the
-  `// scrub:` markers, add made-up lines to `scripts/testdata/scrub.log`
+- **Scrub rules:** the block between the `// scrub:` markers in
+  `vm/config/config.alloy.tmpl` is watchtower's
+  (`config/alloy/config.alloy.example`), copied whole; only the two Referer
+  rules marked in it are the blog's. A change for every service belongs in
+  watchtower's first. Add made-up lines to `scripts/testdata/scrub.log`
   (`keep:`, `same:` or `drop:`; `scrub.caddy.log` for what only Caddy's JSON
   check decides) and what must never come out to `scrub.forbidden`, then
   `make check-alloy` (needs `alloy` v1.21.2 and `jq`).
