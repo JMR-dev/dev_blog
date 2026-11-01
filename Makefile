@@ -59,7 +59,7 @@ check-alloy: ## Format-check and validate the Alloy config; run its scrub rules 
 	scripts/check-alloy-scrub.sh
 
 .PHONY: check-peer
-check-peer: ## Run bootstrap.sh's check of the WireGuard peer config over made-up configs
+check-peer: ## Run bootstrap.sh's check of the WireGuard peer config over made-up configs, and when telemetry stops
 	scripts/check-peer-config.sh
 
 .PHONY: preview

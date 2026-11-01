@@ -234,7 +234,8 @@ jobs:
       # alloy fmt and validate over vm/config/config.alloy.tmpl, and its scrub
       # rules over scripts/testdata/scrub.log: nothing on watchtower scrubs.
       - run: make check-alloy
-      # bootstrap.sh's check of the peer config, which runs on the VM as root.
+      # bootstrap.sh's check of the peer config, which runs on the VM as root,
+      # and of when telemetry stops.
       - run: make check-peer
 
   # Pull requests: show what merging would change. Same-repo PRs only -- Gitea

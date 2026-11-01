@@ -218,8 +218,15 @@ contract; this deployment implements it:
   `SCRUB_SHOW=1 scripts/check-alloy-scrub.sh` prints what would ship.
 - **Off:** remove `blog:watchtowerPeerSecret` from `infra/Pulumi.prod.yaml`
   and merge. The sync stops the tunnel and Alloy and removes their config.
-  A missing, empty or refused secret does the same, with a warning in
-  `journalctl -u blog-config-sync`; the site is never affected.
+  A secret that is missing or has an empty value does the same, with a
+  warning in `journalctl -u blog-config-sync`; the site is never affected.
+  **Only those.** The metadata server not answering, any other error reading
+  the secret (network, 5xx, token, `PERMISSION_DENIED`) or a config refused
+  warns and leaves the tunnel and Alloy running on the config they have. So
+  deleting the secret itself doesn't stop them: `blog-vm@` is granted on that
+  secret, so a deleted one answers `PERMISSION_DENIED`, not `NOT_FOUND`.
+- **Revoking:** delete the `blog-vm` client in wg-easy. That ends the tunnel
+  from the far end, whatever this VM is doing.
 - **Rekeying:** delete the `blog-vm` client in wg-easy; watchtower's next
   deploy publishes a new config, and this VM picks it up on its next sync
   (`make sync`) or boot.

@@ -185,3 +185,267 @@ has "Endpoint = [2001:db8::1]:51820" "an IPv6 endpoint"
 
 ((bad == 0)) || { echo "peer check: check_peer gets these wrong (above)" >&2; exit 1; }
 echo "peer check: ${n} configs, all judged right"
+
+# ---------------------------------------------------------------------------
+# When telemetry stops: render_telemetry and its helpers, run against stubs. Only
+# a missing or empty secret, or no metadata value, takes it down. Anything else
+# warns and leaves it running.
+# ---------------------------------------------------------------------------
+for fn in meta_or_fail telemetry_off telemetry_leave fetch_peer render_telemetry; do
+  sed -n "/^${fn}() {\$/,/^}\$/p" "$script" >"${work}/${fn}.sh"
+  [[ -s "${work}/${fn}.sh" ]] || { echo "peer check: no ${fn} in ${script}" >&2; exit 1; }
+  # shellcheck source=/dev/null
+  source "${work}/${fn}.sh"
+done
+
+# What those functions read, pointed into the scratch directory.
+# shellcheck disable=SC2034
+{
+  WG_IFACE=wg-watchtower
+  WG_DIR="${work}/wireguard"
+  WG_CONF="${WG_DIR}/wg-watchtower.conf"
+  ALLOY_CONF="${work}/alloy/config.alloy"
+  RENDER_DIR="${work}/quadlets"
+  STATE_DIR="${work}/state"
+  WATCHTOWER_PROJECT=watchtower-observe
+  WATCHTOWER_PEER_SECRET=wireguard-blog-vm-peer
+  PEER_META_READ=1
+  PEER_FETCH_ERROR=""
+  TELEMETRY_ON=0
+}
+
+log() { echo "log: $*" >&2; }
+warn() { echo "warn: $*" >&2; }
+# Every action on a unit, to read back.
+systemctl() { echo "systemctl $*" >>"${work}/calls"; }
+restorecon() { :; }
+rpm() { [[ "${WG_TOOLS:-yes}" == yes ]]; }
+dnf() { return 1; }
+getent() { [[ "${JOURNAL_GROUP:-yes}" == yes ]] && echo 'systemd-journal:x:190:'; }
+render() { return 1; }
+# Only render_telemetry's -d comes here, and -o root wouldn't work unprivileged.
+install() { mkdir -p "${!#}"; }
+
+# The server's answer: the value then the status, as curl's -w writes it.
+curl() {
+  case "$META" in
+    set) printf 'wireguard-blog-vm-peer\n200' ;;
+    empty) printf '\n200' ;;
+    404) printf '<html>not found</html>\n404' ;;
+    500) printf '<html>error</html>\n500' ;;
+    503) printf '\n503' ;;
+    down) return 7 ;;
+  esac
+}
+
+# gcloud as it answers each case. fakeGCLOUD marks what may never be printed.
+gcloud() {
+  case "$SECRET" in
+    good) valid ;;
+    changed) valid | sed 's/^MTU = 1380/MTU = 1280/' ;;
+    empty) ;;
+    refused) valid | sed 's#^AllowedIPs = .*#AllowedIPs = 0.0.0.0/0#' ;;
+    no-secret)
+      echo 'ERROR: (gcloud.secrets.versions.access) NOT_FOUND: Secret [projects/1/secrets/x] not found. fakeGCLOUD' >&2
+      return 1
+      ;;
+    no-version)
+      echo 'ERROR: (gcloud.secrets.versions.access) NOT_FOUND: Secret Version [projects/1/secrets/x/versions/latest] not found. fakeGCLOUD' >&2
+      return 1
+      ;;
+    denied)
+      echo "ERROR: (gcloud.secrets.versions.access) PERMISSION_DENIED: Permission 'secretmanager.versions.access' denied (or it may not exist). fakeGCLOUD" >&2
+      return 1
+      ;;
+    5xx)
+      echo 'ERROR: (gcloud.secrets.versions.access) UNAVAILABLE: The service is currently unavailable. fakeGCLOUD' >&2
+      return 1
+      ;;
+    network)
+      echo 'ERROR: gcloud crashed (ConnectionError): HTTPSConnectionPool: Max retries exceeded. fakeGCLOUD' >&2
+      return 1
+      ;;
+    token)
+      echo 'ERROR: (gcloud.secrets.versions.access) There was a problem refreshing your current auth tokens. fakeGCLOUD' >&2
+      return 1
+      ;;
+  esac
+}
+
+# A host with telemetry running on the old config, or with none at all.
+running() {
+  rm -rf "$WG_DIR" "$RENDER_DIR" "$STATE_DIR" "${work}/alloy"
+  mkdir -p "$WG_DIR" "$RENDER_DIR" "$STATE_DIR/config" "$STATE_DIR/quadlets" "${work}/alloy"
+  echo old >"$WG_CONF"
+  echo old >"$ALLOY_CONF"
+  echo old >"${RENDER_DIR}/alloy.container"
+  echo old >"${RENDER_DIR}/alloy-data.volume"
+  : >"${work}/calls"
+}
+fresh() {
+  running
+  rm -f "$WG_CONF" "$ALLOY_CONF" "${RENDER_DIR}"/alloy*
+}
+# As bootstrap.sh runs it: under set -e, and not in a condition, which would
+# switch that off.
+go() {
+  n=$((n + 1))
+  set +e
+  (
+    set -e
+    render_telemetry
+    echo "$TELEMETRY_ON" >"${work}/telemetry_on"
+  ) >"${work}/printed" 2>&1
+  rc=$?
+  set -e
+  if ((rc)); then
+    echo "render_telemetry failed the bootstrap: $1"
+    bad=1
+  fi
+  if grep -q -e fakeGCLOUD -e "$priv" -e "$pub" -e "$psk" "${work}/printed"; then
+    echo "printed gcloud's error or a key: $1"
+    bad=1
+  fi
+  if compgen -G "${WG_DIR}/.peer-*" >/dev/null; then
+    echo "left a temporary file behind: $1"
+    bad=1
+  fi
+}
+says() {
+  if ! grep -qF -- "$1" "${work}/printed"; then
+    echo "didn't say \"${1}\": $2"
+    bad=1
+  fi
+}
+torn_down() {
+  go "$1"
+  if [[ -e "$WG_CONF" || -e "$ALLOY_CONF" || -e "${RENDER_DIR}/alloy.container" ]]; then
+    echo "left config behind: $1"
+    bad=1
+  fi
+  if ! grep -q "disable --now wg-quick@${WG_IFACE}" "${work}/calls" || ! grep -q 'stop alloy.service' "${work}/calls"; then
+    echo "didn't stop them: $1"
+    bad=1
+  fi
+  if [[ "$(cat "${work}/telemetry_on")" != 0 ]]; then
+    echo "the deploy check would run: $1"
+    bad=1
+  fi
+}
+# Nothing touched: the old config in place, and no unit stopped or restarted.
+left_alone() {
+  go "$1"
+  if [[ "$(cat "$WG_CONF")" != old || "$(cat "$ALLOY_CONF")" != old || "$(cat "${RENDER_DIR}/alloy.container")" != old ]]; then
+    echo "changed the config: $1"
+    bad=1
+  fi
+  if [[ -s "${work}/calls" ]]; then
+    echo "touched a unit: $1: $(cat "${work}/calls")"
+    bad=1
+  fi
+  if [[ "$(cat "${work}/telemetry_on")" != 1 ]]; then
+    echo "the deploy check wouldn't run: $1"
+    bad=1
+  fi
+  says "left as it is" "$1"
+}
+
+# The metadata read, on its own: a value, not set, or could not ask.
+meta_case() {
+  local want_rc="$1" want_value="$2" got got_rc=0
+  META="$3"
+  got="$(meta_or_fail watchtower-peer-secret)" || got_rc=$?
+  n=$((n + 1))
+  if [[ "$got_rc" != "$want_rc" || "$got" != "$want_value" ]]; then
+    echo "metadata answering ${META}: rc ${got_rc}, value \"${got}\""
+    bad=1
+  fi
+}
+meta_case 0 wireguard-blog-vm-peer set
+meta_case 0 "" empty
+meta_case 0 "" 404
+meta_case 1 "" 500
+meta_case 1 "" 503
+meta_case 1 "" down
+
+# No peer: down it comes.
+SECRET=good
+WATCHTOWER_PEER_SECRET=""
+running
+torn_down "no metadata value"
+says "no watchtower-peer-secret metadata" "no metadata value"
+fresh
+go "no metadata value, nothing running"
+says "log: watchtower telemetry off" "no metadata value, nothing running"
+[[ ! -s "${work}/calls" ]] || { echo "touched a unit with nothing running"; bad=1; }
+WATCHTOWER_PEER_SECRET=wireguard-blog-vm-peer
+for SECRET in no-secret no-version empty; do
+  running
+  torn_down "secret: ${SECRET}"
+  says "is missing or empty" "secret: ${SECRET}"
+done
+
+# Anything else: left running, with a warning.
+for SECRET in denied 5xx network token; do
+  running
+  left_alone "secret: ${SECRET}"
+done
+says "a network, API or credentials error" "secret: token"
+SECRET=denied
+running
+left_alone "secret: denied, again"
+says "permission denied" "secret: denied"
+SECRET=refused
+running
+left_alone "a refused config"
+says "refused" "a refused config"
+
+# A failed metadata read isn't no peer, even though the name is empty.
+SECRET=no-secret
+WATCHTOWER_PEER_SECRET=""
+PEER_META_READ=0
+running
+left_alone "the metadata server not answering"
+PEER_META_READ=1
+WATCHTOWER_PEER_SECRET=wireguard-blog-vm-peer
+
+SECRET=good
+WG_TOOLS=no
+running
+left_alone "wireguard-tools not installable"
+WG_TOOLS=yes
+JOURNAL_GROUP=no
+running
+left_alone "no systemd-journal group"
+JOURNAL_GROUP=yes
+
+# Nothing there yet, and a failure: nothing to start, no deploy check to wait on.
+SECRET=denied
+fresh
+go "a failure with no config yet"
+says "left as it is" "a failure with no config yet"
+if [[ -s "${work}/calls" || -e "$WG_CONF" || "$(cat "${work}/telemetry_on")" != 0 ]]; then
+  echo "acted on a failure with no config yet"
+  bad=1
+fi
+
+# And when it works: a new config restarts the tunnel, an unchanged one doesn't.
+SECRET=good
+fresh
+go "a first config"
+grep -qxF "PrivateKey = ${priv}" "$WG_CONF" || { echo "a first config wasn't installed"; bad=1; }
+grep -q "restart wg-quick@${WG_IFACE}" "${work}/calls" || { echo "a first config didn't restart the tunnel"; bad=1; }
+grep -q 'restart alloy.service' "${work}/calls" || { echo "a first config didn't restart Alloy"; bad=1; }
+[[ "$(cat "${work}/telemetry_on")" == 1 ]] || { echo "a first config: the deploy check wouldn't run"; bad=1; }
+: >"${work}/calls"
+go "the same config again"
+grep -q "restart" "${work}/calls" && { echo "the same config restarted something"; bad=1; }
+grep -q "start wg-quick@${WG_IFACE}" "${work}/calls" || { echo "the same config didn't start the tunnel"; bad=1; }
+SECRET=changed
+: >"${work}/calls"
+go "a changed config"
+grep -qxF "MTU = 1280" "$WG_CONF" || { echo "a changed config wasn't installed"; bad=1; }
+grep -q "restart wg-quick@${WG_IFACE}" "${work}/calls" || { echo "a changed config didn't restart the tunnel"; bad=1; }
+
+((bad == 0)) || { echo "peer check: render_telemetry gets these wrong (above)" >&2; exit 1; }
+echo "peer check: ${n} checks in all, telemetry stops only when it should"

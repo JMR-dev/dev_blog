@@ -22,7 +22,8 @@ readonly LOG_TAG=blog-bootstrap
 # deployment.
 readonly WATCHTOWER_PROJECT=watchtower-observe
 readonly WG_IFACE=wg-watchtower
-readonly WG_CONF=/etc/wireguard/wg-watchtower.conf
+readonly WG_DIR=/etc/wireguard
+readonly WG_CONF=${WG_DIR}/wg-watchtower.conf
 readonly ALLOY_CONF=/etc/blog/alloy/config.alloy
 
 log()  { echo "[${LOG_TAG}] $*" >&2; }
@@ -38,6 +39,20 @@ MODE=full
 meta() {
     curl -fsS -H 'Metadata-Flavor: Google' \
         "http://169.254.169.254/computeMetadata/v1/instance/attributes/$1" 2>/dev/null || true
+}
+
+# For the peer secret's name, where "not set" stops the tunnel. A 404 is not
+# set, and prints nothing. Anything else the server fails to answer returns 1,
+# so a failed read never counts as no peer.
+meta_or_fail() {
+    local out
+    out=$(curl -sS -m 10 --retry 2 -w '\n%{http_code}' -H 'Metadata-Flavor: Google' \
+        "http://169.254.169.254/computeMetadata/v1/instance/attributes/$1" 2>/dev/null) || return 1
+    case "${out##*$'\n'}" in
+        200) printf '%s' "${out%$'\n'*}" ;;
+        404) ;;
+        *) return 1 ;;
+    esac
 }
 
 CONFIG_BUCKET=$(meta config-bucket)
@@ -56,7 +71,9 @@ WAF_MODE=$(meta waf-mode)
 DATA_DISK_DEVICE=$(meta data-disk-device)
 SECRET_NAMES=$(meta secret-names)
 # A secret's name in WATCHTOWER_PROJECT, never its value. Empty: no telemetry.
-WATCHTOWER_PEER_SECRET=$(meta watchtower-peer-secret)
+# PEER_META_READ=0: the metadata server didn't say, so nothing is known.
+PEER_META_READ=1
+WATCHTOWER_PEER_SECRET=$(meta_or_fail watchtower-peer-secret) || PEER_META_READ=0
 
 [[ -n "${CONFIG_BUCKET}" ]] || die "config-bucket metadata is missing; nothing to sync from"
 [[ -n "${DOMAIN}"        ]] || die "domain metadata is missing"
@@ -646,9 +663,14 @@ setup_caddy_logs() {
 # this VM's service account may read.
 #
 # Both have a changed flag of their own and restart only each other, never the
-# site, and render after it. No peer (the metadata unset, the secret missing,
-# empty or refused) is a warning, not a failure: the tunnel and Alloy stop and
-# their config goes.
+# site, and render after it.
+#
+# Only no peer takes them down: the metadata unset, or the secret missing or
+# empty. That is a warning, not a failure: the tunnel and Alloy stop and their
+# config goes. Anything else (the metadata server not answering, any other
+# error reading the secret, a config refused) warns and leaves them running as
+# they are, so an outage at Secret Manager doesn't stop the logs. Revoking a
+# peer is done by deleting its client in wg-easy, never from here.
 #
 # The peer config holds this VM's WireGuard private key, and this script's
 # output reaches the serial console and Cloud Logging at boot. So the config
@@ -658,6 +680,8 @@ setup_caddy_logs() {
 
 # Set by render_telemetry for check_telemetry.
 TELEMETRY_ON=0
+# Why fetch_peer returned 1: words of ours, nothing from gcloud.
+PEER_FETCH_ERROR=""
 
 # Stops and removes the tunnel and Alloy. $1 says why, with nothing from the
 # secret in it. A warning, unless $2 is "quiet" (no peer configured, on
@@ -666,7 +690,7 @@ telemetry_off() {
     local was_on=0
     # A run that died half-way can leave the raw config here, private key and
     # all.
-    rm -f /etc/wireguard/.peer-*
+    rm -f "${WG_DIR}"/.peer-*
     [[ -f "${WG_CONF}" || -f "${RENDER_DIR}/alloy.container" ]] && was_on=1
     if [[ "${2:-}" == quiet ]] && (( ! was_on )); then
         log "watchtower telemetry off: $1"
@@ -774,41 +798,90 @@ check_peer() {
     ' "${src}" > "${dst}"
 }
 
+# Leaves the tunnel and Alloy as they are. $1 says why, with nothing from the
+# secret in it. If there is a config, check_telemetry still says whether they
+# are up.
+telemetry_leave() {
+    warn "watchtower telemetry left as it is: $1"
+    if [[ -f "${WG_CONF}" ]]; then
+        TELEMETRY_ON=1
+    fi
+}
+
+# Reads the peer config into the file $1. Returns 0 with it there, 2 when the
+# secret or its version is missing or the value is empty, and 1 on any other
+# error, naming it in PEER_FETCH_ERROR.
+#
+# The value goes only to the file. gcloud's stderr goes only to this variable,
+# which is matched and never printed: nothing from this call may reach the boot
+# output.
+fetch_peer() {
+    local err
+    if err=$(gcloud secrets versions access latest --secret="${WATCHTOWER_PEER_SECRET}" \
+            --project="${WATCHTOWER_PROJECT}" 2>&1 >"$1"); then
+        [[ -s "$1" ]] || return 2
+        return 0
+    fi
+    case "${err}" in
+        *NOT_FOUND*) return 2 ;;
+        *PERMISSION_DENIED*) PEER_FETCH_ERROR="permission denied" ;;
+        *) PEER_FETCH_ERROR="a network, API or credentials error" ;;
+    esac
+    return 1
+}
+
 # Installs the tunnel config and renders Alloy, restarting either only when it
 # changed.
 render_telemetry() {
     TELEMETRY_ON=0
+    if (( ! PEER_META_READ )); then
+        telemetry_leave "the metadata server did not answer for watchtower-peer-secret"
+        return 0
+    fi
     if [[ -z "${WATCHTOWER_PEER_SECRET}" ]]; then
         telemetry_off "no watchtower-peer-secret metadata (blog:watchtowerPeerSecret)" quiet
         return 0
     fi
     if ! rpm -q wireguard-tools >/dev/null 2>&1 && ! dnf -y install wireguard-tools; then
-        telemetry_off "wireguard-tools is not installable"
+        telemetry_leave "wireguard-tools is not installable"
         return 0
     fi
 
-    local raw conf tunnel_changed=0 alloy_changed=0
-    install -d -o root -g root -m 0700 /etc/wireguard
+    local raw conf fetched=0 journal_gid tunnel_changed=0 alloy_changed=0
+    install -d -o root -g root -m 0700 "${WG_DIR}"
     # Left behind only if a run died half-way.
-    rm -f /etc/wireguard/.peer-*
+    rm -f "${WG_DIR}"/.peer-*
     # mktemp makes both 0600, in the 0700 directory: the config never touches
     # /tmp, a variable or the output.
-    raw=$(mktemp /etc/wireguard/.peer-raw.XXXXXX)
-    conf=$(mktemp /etc/wireguard/.peer-conf.XXXXXX)
-    # gcloud's stderr goes nowhere: an error there is no use without a value
-    # to show, and nothing from this call may reach the boot output.
-    if ! gcloud secrets versions access latest --secret="${WATCHTOWER_PEER_SECRET}" \
-            --project="${WATCHTOWER_PROJECT}" > "${raw}" 2>/dev/null || [[ ! -s "${raw}" ]]; then
+    raw=$(mktemp "${WG_DIR}/.peer-raw.XXXXXX")
+    conf=$(mktemp "${WG_DIR}/.peer-conf.XXXXXX")
+    fetch_peer "${raw}" || fetched=$?
+    if (( fetched == 2 )); then
         rm -f "${raw}" "${conf}"
-        telemetry_off "secret ${WATCHTOWER_PEER_SECRET} in ${WATCHTOWER_PROJECT} is missing, empty or unreadable"
+        telemetry_off "secret ${WATCHTOWER_PEER_SECRET} in ${WATCHTOWER_PROJECT} is missing or empty"
+        return 0
+    fi
+    if (( fetched != 0 )); then
+        rm -f "${raw}" "${conf}"
+        telemetry_leave "could not read secret ${WATCHTOWER_PEER_SECRET} in ${WATCHTOWER_PROJECT}: ${PEER_FETCH_ERROR}"
         return 0
     fi
     if ! check_peer "${raw}" "${conf}"; then
         rm -f "${raw}" "${conf}"
-        telemetry_off "the peer config in ${WATCHTOWER_PEER_SECRET} failed its checks (a split tunnel, no hooks, well-formed keys); refused"
+        telemetry_leave "the peer config in ${WATCHTOWER_PEER_SECRET} failed its checks (a split tunnel, no hooks, well-formed keys); refused"
         return 0
     fi
     rm -f "${raw}"
+
+    # Alloy reads the journal as the image's own uid plus this group. Before
+    # the config goes in, so a new one is never left there unapplied.
+    journal_gid=$(getent group systemd-journal | cut -d: -f3) || journal_gid=""
+    if [[ -z "${journal_gid}" ]]; then
+        rm -f "${conf}"
+        telemetry_leave "no systemd-journal group"
+        return 0
+    fi
+
     if [[ -f "${WG_CONF}" ]] && cmp -s "${conf}" "${WG_CONF}"; then
         rm -f "${conf}"
     else
@@ -818,10 +891,6 @@ render_telemetry() {
         tunnel_changed=1
     fi
 
-    # Alloy reads the journal as the image's own uid plus this group.
-    local journal_gid
-    journal_gid=$(getent group systemd-journal | cut -d: -f3) || journal_gid=""
-    [[ -n "${journal_gid}" ]] || { telemetry_off "no systemd-journal group"; return 0; }
     export JOURNAL_GID="${journal_gid}"
     mkdir -p "$(dirname "${ALLOY_CONF}")"
     render "${STATE_DIR}/config/config.alloy.tmpl" "${ALLOY_CONF}" root:root 0644 \

@@ -12,8 +12,8 @@
 Description=Grafana Alloy (journal and metrics -> watchtower)
 # No tunnel, no Alloy: watchtower.jasonmross.dev resolves to 10.8.0.1, which
 # exists only inside the tunnel. bootstrap.sh removes the tunnel config while
-# there is no peer (blog:watchtowerPeerSecret unset, or its secret empty), and
-# this unit is then skipped at boot, not failed.
+# there is no peer (blog:watchtowerPeerSecret unset, or its secret missing or
+# empty), and this unit is then skipped at boot, not failed.
 ConditionPathExists=/etc/wireguard/wg-watchtower.conf
 Wants=wg-quick@wg-watchtower.service network-online.target
 After=wg-quick@wg-watchtower.service network-online.target
