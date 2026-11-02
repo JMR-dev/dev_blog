@@ -23,7 +23,7 @@ ContainerName=alloy
 # Tag plus digest (the multi-arch index): the release watchtower's contract
 # pins. No AutoUpdate=, so podman-auto-update and scripts/vm-rollout.sh leave
 # it alone; bump it here by hand.
-Image=docker.io/grafana/alloy:v1.21.2@sha256:89a5a320168387336b9ac3c850609c3ba7757eadd4ae5f1d819deb35e9854b18
+Image=docker.io/grafana/alloy:v1.21.3@sha256:8ab871206bd2d8f89277f53abffee5f452a293980788d52f85fa183a87a505a4
 # The host's network, so pushes route through the tunnel interface and Caddy's
 # metrics (127.0.0.1:2020) are on loopback in either Caddy mode. Alloy's own
 # UI listens on 127.0.0.1:12345 only (Exec= below), and nothing else.

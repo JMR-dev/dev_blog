@@ -193,7 +193,7 @@ contract; this deployment implements it:
   VM by `blog-vm@` only. `vm/bootstrap.sh` (`render_telemetry`) refuses it
   unless it is a split tunnel with no hooks, drops its DNS, and installs it
   at `/etc/wireguard/wg-watchtower.conf` (root, 0600). Nothing prints it.
-- **Alloy** (`vm/quadlets/alloy.container`): v1.21.2, pinned by digest and
+- **Alloy** (`vm/quadlets/alloy.container`): v1.21.3, pinned by digest and
   never auto-updated; 192 MiB at most; its UI on `127.0.0.1:12345` only. It
   reads the persistent journal (every unit, the site and Caddy included)
   and scrubs it before anything leaves the host (`vm/config/config.alloy.tmpl`:
@@ -218,7 +218,7 @@ contract; this deployment implements it:
   check decides) and what must never come out to `scrub.forbidden`. Whole
   lines as they must come out go in `scrub.expect`, and unit labels going in
   and coming out in `scrub.units`. Then `make check-alloy` (needs `alloy`
-  v1.21.2 and `jq`).
+  v1.21.3 and `jq`).
   `SCRUB_SHOW=1 scripts/check-alloy-scrub.sh` prints what would ship.
 - **Off:** remove `blog:watchtowerPeerSecret` from `infra/Pulumi.prod.yaml`
   and merge. The sync stops the tunnel and Alloy and removes their config.

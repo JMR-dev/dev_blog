@@ -215,8 +215,8 @@ jobs:
       # sha256 in the release's SHA256SUMS; jq and envsubst for check-alloy.
       - name: Install Alloy
         env:
-          ALLOY_VERSION: "1.21.2"
-          ALLOY_SHA256: 1eadb46a0640127184250173acd9b4145e4d590680db37ffe66fa8afd07f04cf
+          ALLOY_VERSION: "1.21.3"
+          ALLOY_SHA256: 50d23af2d0f98c00beac6ce9a365693e60f87fb76b6cad6fe1d161e80588af6d
         run: |
           SUDO=""; [[ $(id -u) -ne 0 ]] && SUDO=sudo
           if ! command -v jq >/dev/null || ! command -v unzip >/dev/null || ! command -v envsubst >/dev/null; then

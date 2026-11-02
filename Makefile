@@ -46,7 +46,7 @@ check: ## Build, vet and test the Pulumi program; syntax-check and lint the shel
 # rendered with the same variable list vm/bootstrap.sh uses, and any ${...}
 # still in the render is a variable missing from that list. Then the scrub
 # rules run over scripts/testdata/scrub.log and scrub.caddy.log. Needs alloy
-# (v1.21.2), jq and envsubst; CI installs alloy in the infra-check job.
+# (v1.21.3), jq and envsubst; CI installs alloy in the infra-check job.
 ALLOY_TMPL := vm/config/config.alloy.tmpl
 
 .PHONY: check-alloy
