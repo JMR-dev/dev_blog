@@ -42,4 +42,8 @@ config:
   # Coraza WAF: On | DetectionOnly | Off. Start in DetectionOnly, review what
   # it flags, then switch to On. The fail2ban WAF jail follows this value.
   blog:wafMode: DetectionOnly
+  # This VM's WireGuard peer for watchtower (logs and metrics), a secret in
+  # project watchtower-observe that only blog-vm@ may read. Its name, not its
+  # value. Remove the line to take the tunnel and Alloy down.
+  blog:watchtowerPeerSecret: wireguard-blog-vm-peer
 encryptionsalt: v1:Tj5znAFOOxE=:v1:kcFEiVqCz5GBOb6C:y5fEmheDeVQRIr6FDLZ/I6W4KF6dRw==

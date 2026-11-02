@@ -1,0 +1,46 @@
+LEAK[0-9]
+192\.0\.2\.
+198\.51\.100\.
+10\.0\.0\.5
+2001:db8
+fe80::1
+ ::1\b
+Zm9vOmJhcg
+@example\.com
+@mail\.example\.org
+%40leak
+sam_sample
+sa_1234567890123
+4111111111111111
+5500-0000
+378282246310005
+3f2504e0
+7c9e6679
+eyJhbGci
+"transaction"
+078051120
+cvv=123
+00:1a:2b
+search\.example\.net
+Matched Data
+10\.89\.10\.
+203\.0\.113\.
+35\.235\.
+pat_example
+42:01:0a
+10\.10\.0\.
+10\.8\.0\.
+owner@
+fake\]LEAK
+8675309
+31415926
+2\.71828
+42424242
+192-0-2-
+198-51-100-
+2001%3A
+"[A-Za-z-]*([Cc]ookie|[Aa]uthorization)": *\[?"
+\\"[A-Za-z_-]*([Cc]ookie|[Pp]assword|[Tt]oken|[Ss]ession|[Kk]ey)\\": *(\[\\"|\\")
+uid=1000000000
+314159265[0-9]
+@1000000000

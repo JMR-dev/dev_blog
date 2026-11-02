@@ -1,0 +1,160 @@
+same:01 2026-10-26T03:12:45Z vaultwarden::api::core::accounts at 12:34:56.789 took 1761448334123 ms
+keep:02 Failed login from 192.0.2.10 port 51515
+keep:03 peer 2001:db8::1 and [fe80::1%eth0]:443 and ::1
+keep:04 GET /api/v1/pull?access_token=fakeLEAK01&page=2&code=fakeLEAK02 HTTP/1.1
+keep:05 Authorization: Bearer fakeLEAK03
+keep:06 {"request":{"headers":{"Authorization":["Basic Zm9vOmJhcg=="],"Cookie":["i_like_gitea=fakeLEAK04; lang=en"]}}}
+keep:07 Set-Cookie: session=fakeLEAK05; Path=/; HttpOnly
+keep:08 {"user":"x","password":"fakeLEAK06","api_key":"fakeLEAK07"}
+keep:09 login password=fakeLEAK08 user=bob
+keep:10 contact bob@example.com or alice.smith+tag@mail.example.org
+keep:11 sshd[123]: Accepted publickey for sam_sample_gmail_com from 198.51.100.7
+keep:12 sudo: sa_1234567890123 : TTY=pts/0 ; COMMAND=/bin/true
+keep:13 card 4111111111111111 and 5500-0000-0000-0004 and 378282246310005
+keep:14 cipher 3f2504e0-4f89-41d3-9a0c-0305e82c3301 for user 7c9e6679-7425-40de-944b-e07fc1f90ae7
+keep:15 jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJl here # nosemgrep: generic.secrets.security.detected-jwt-token.detected-jwt-token
+drop:16 {"transaction":{"client_ip":"192.0.2.66","request":{"headers":{"cookie":["x"]}}}}
+keep:17 config dump: cvv=123 ssn: 078051120
+keep:20 env DB_PASSWORD=fakeLEAK20 POSTGRES_PASSWORD=fakeLEAK21 SMTP_PASSWORD=fakeLEAK22
+keep:21 {"db_password":"fakeLEAK23","smtp_password":"fakeLEAK24"}
+keep:22 login password="fakeLEAK25" user=bob
+keep:23 X-API-Key: fakeLEAK26
+keep:24 X-Auth-Token: fakeLEAK27
+keep:25 token=fakeLEAK28 session=fakeLEAK29
+keep:26 {"resp_headers":{"Set-Cookie":["sid=fakeLEAK30; Path=/","_csrf=fakeLEAK31; Path=/"]}}
+keep:27 dsn postgres://app:fakeLEAK32@localhost:5432/app and redis://:fakeLEAK33@10.0.0.5:6379
+keep:28 GET /reset?email=bob%40leak.example.com HTTP/1.1
+keep:29 aws_secret_access_key=fakeLEAK34 github_token=fakeLEAK35
+keep:30 {"cookies":{"session":"fakeLEAK36"}}
+keep:31 client:2001:db8::77 connected
+keep:32 mac 00:1a:2b:3c:4d:5e
+keep:33 Authorization: Digest username="fakeLEAK37", response="fakeLEAK38"
+keep:34 secret: "fakeLEAK39"
+keep:35 "password": 'fakeLEAK40'
+keep:36 PASSWORD: "fakeLEAK41"
+keep:37 user_password=fakeLEAK42 old-password=fakeLEAK43
+keep:38 {"Password" : "fakeLEAK44"}
+keep:39 privateKey=fakeLEAK45 private_key=fakeLEAK46
+keep:40 retrying with bearer fakeLEAK47tok after 401
+same:50 listening on ports 3100 8080 4317 4318 9095
+same:51 vaultwarden::api::core::organizations: find_by_user_and_org took 3 ms
+same:52 metric node_disk_io scraped
+same:53 kernel 6.12.0-55.9.1.el10_0.x86_64 build 10.0.19041.1
+same:54 db::query ok
+same:55 trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=00f067aa0ba902b7 dur=3 ms
+same:56 rows 1 2 3 4 5 6 7 8 9 10 11 12 13
+same:57 offset 3456789012345 committed
+same:58 deploy finished: 3 hosts ok, cert expires 2026-12-01, version 1.21.2
+same:59 2026-10-26 03:12:45 mimir ingester ring healthy, 150000 series
+keep:60 {"level":"info","ts":1793018976.1572938,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.77","remote_port":"51234","client_ip":"203.0.113.77","proto":"HTTP/2.0","method":"GET","host":"blog.jasonmross.dev","uri":"/posts/hello-world/","headers":{"Accept":["text/html"],"Referer":["https://search.example.net/?q=fakeLEAK60"],"Cookie":["REDACTED"],"User-Agent":["Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"]},"tls":{"resumed":false,"version":772,"cipher_suite":4865,"proto":"h2","server_name":"blog.jasonmross.dev"}},"bytes_read":0,"user_id":"","duration":0.0012,"size":5120,"status":200,"resp_headers":{"Referrer-Policy":["strict-origin-when-cross-origin"],"Content-Type":["text/html; charset=utf-8"]}}
+keep:61 {"level":"info","ts":1793018976.1572938,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"2001:db8:85a3::8a2e:370:7334","remote_port":"51234","client_ip":"2001:db8:85a3::8a2e:370:7334","proto":"HTTP/2.0","method":"GET","host":"blog.jasonmross.dev","uri":"/posts/hello-world/","headers":{"Accept":["text/html"],"Referer":["https://fakeLEAK61.example.org/list"],"Cookie":["REDACTED"],"User-Agent":["Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"]},"tls":{"resumed":false,"version":772,"cipher_suite":4865,"proto":"h2","server_name":"blog.jasonmross.dev"}},"bytes_read":0,"user_id":"","duration":0.0012,"size":5120,"status":404,"resp_headers":{"Referrer-Policy":["strict-origin-when-cross-origin"],"Content-Type":["text/html; charset=utf-8"]}}
+keep:62 {"level":"error","ts":1793018976.1633677,"logger":"http.handlers.waf","msg":"[client \"198.51.100.23\"] Coraza: Warning. XSS Attack Detected via libinjection [file \"@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf\"] [line \"5205\"] [id \"941100\"] [rev \"\"] [msg \"XSS Attack Detected via libinjection\"] [data \"Matched Data: XSS data found within ARGS:comment: <script>fakeLEAK62</script>\"] [severity \"critical\"] [ver \"OWASP_CRS/4.25.0\"] [maturity \"0\"] [accuracy \"0\"] [tag \"application-multi\"] [tag \"attack-xss\"] [hostname \"10.89.10.3\"] [uri \"/search\"] [unique_id \"iZeFgwRepEArdWut\"]"}
+keep:63 {"level":"error","ts":1793018976.1633677,"logger":"http.handlers.waf","msg":"[client \"198.51.100.24\"] Coraza: Warning. XSS Attack Detected via libinjection [file \"@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf\"] [line \"5205\"] [id \"941100\"] [rev \"\"] [msg \"XSS Attack Detected via libinjection\"] [data \"Matched Data: x found within ARGS:q: \\\"] [severity \\\"fakeLEAK63\"] [severity \"critical\"] [ver \"OWASP_CRS/4.25.0\"] [maturity \"0\"] [accuracy \"0\"] [tag \"application-multi\"] [tag \"attack-xss\"] [hostname \"10.89.10.3\"] [uri \"/search\"] [unique_id \"iZeFgwRepEArdWut\"]"}
+keep:64 {"level":"error","ts":1793018976.1633677,"logger":"http.handlers.waf","msg":"[client \"203.0.113.9\"] Coraza: Access denied (phase 2). Inbound Anomaly Score Exceeded (Total Score: 23) [file \"@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf\"] [line \"5205\"] [id \"949110\"] [rev \"\"] [msg \"XSS Attack Detected via libinjection\"] [data \"\"] [severity \"emergency\"] [ver \"OWASP_CRS/4.25.0\"] [maturity \"0\"] [accuracy \"0\"] [tag \"application-multi\"] [tag \"attack-xss\"] [hostname \"10.89.10.3\"] [uri \"/?file=../../../../etc/passwd\"] [unique_id \"iZeFgwRepEArdWut\"]"}
+drop:65 {"transaction":{"timestamp":"2026/10/26 12:49:36","unix_timestamp":1793018976162668696,"id":"iZeFgwRepEArdWut","client_ip":"192.0.2.66","client_port":0,"host_ip":"","host_port":0,"server_id":"blog.jasonmross.dev","request":{"method":"POST","protocol":"HTTP/1.1","uri":"/search","http_version":"","headers":{"cookie":["sid=fakeLEAK65"],"content-type":["application/x-www-form-urlencoded"],"user-agent":["curl/8.18.0"]},"body":"q=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","files":null,"args":{},"length":8402},"response":{"protocol":"","status":0,"headers":{},"body":""},"producer":{"connector":"","version":"","server":"","rule_engine":"DetectionOnly","rulesets":["OWASP_CRS/4.25.0"]},"highest_severity":"","is_interrupted":false},"messages":[]}
+keep:66 {"level":"info","ts":1793018976.2,"logger":"tls.obtain","msg":"creating new account because no account for configured email is known to storage","email":"owner@example.com"}
+keep:67 sshd-session[2345]: Accepted publickey for pat_example_gmail_com from 35.235.244.33 port 40122 ssh2
+keep:68 sudo[4567]: pat_example_gmail_com : TTY=pts/0 ; PWD=/home/pat_example_gmail_com ; USER=root ; COMMAND=/usr/bin/journalctl -u caddy
+keep:69 fail2ban.actions [987]: NOTICE  [caddy-coraza] Ban 203.0.113.99
+keep:70 kernel: nft-drop-in: IN=eth0 OUT= MAC=42:01:0a:0a:00:02:42:01:0a:0a:00:01:08:00 SRC=192.0.2.200 DST=10.10.0.2 LEN=44 TOS=0x00 PREC=0x00 TTL=243 ID=54321 PROTO=TCP SPT=40000 DPT=23 WINDOW=1024 RES=0x00 SYN URGP=0
+keep:71 wg-quick[812]: [#] ip -4 address add 10.8.0.134/32 dev wg-watchtower
+keep:72 GET /posts/ HTTP/1.1 Referer: https://fakeLEAK72.example.org/page
+keep:73 {"level":"error","ts":1793018977.5,"logger":"http.handlers.waf","msg":"[client \"192.0.2.73\"] Coraza: Warning. XSS Filter - Category 1: Script Tag Vector [file \"@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf\"] [line \"5226\"] [id \"941110\"] [rev \"\"] [msg \"XSS Filter - Category 1: Script Tag Vector\"] [data \"Matched Data: <script> found within REQUEST_HEADERS:Referer: https://fakeLEAK73.example.org/?q=<script>\"] [severity \"critical\"] [ver \"OWASP_CRS/4.25.0\"] [maturity \"0\"] [accuracy \"0\"] [tag \"attack-xss\"] [hostname \"10.89.10.3\"] [uri \"/\"] [unique_id \"aB3dE5fG7hJ9kL1m\"]"}
+keep:74 {"level":"info","ts":1793018978.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.74","remote_port":"40312","client_ip":"203.0.113.74","proto":"HTTP/1.1","method":"GET","host":"blog.jasonmross.dev","uri":"/","headers":{"Referer":["https://shop.example.org/list?tags[]=fakeLEAK74&page=2"],"User-Agent":["Mozilla/5.0"]}},"bytes_read":0,"user_id":"","duration":0.001,"size":5120,"status":200,"resp_headers":{}}
+keep:75 {"level":"info","ts":1793018978.2,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.75","headers":{"Referer":"https://q.example.org/?q=say \"fakeLEAK75\" here"}},"status":200}
+keep:76 {"level":"error","ts":1793018978.3,"logger":"http.log.error.log0","msg":"dial tcp 10.89.10.2:8080: connect: connection refused","request":{"remote_ip":"198.51.100.76","remote_port":"49940","client_ip":"198.51.100.76","proto":"HTTP/2.0","method":"GET","host":"blog.jasonmross.dev","uri":"/posts/","headers":{"User-Agent":["curl/8.18.0"],"Accept":["*/*"],"Referer":["https://fakeLEAK76.example.org/"]}},"duration":0.0004,"status":502,"err_id":"a1b2c3d4e","err_trace":"reverseproxy.statusError (reverseproxy.go:1390)"}
+same:80 wg-quick[812]: [#] ip link set mtu 1380 up dev wg-watchtower
+same:81 blog-bootstrap[2210]: [blog-bootstrap] the watchtower tunnel or Alloy changed -- restarting Alloy
+same:82 podman[3120]: 2026-10-26 05:00:12.345678901 +0000 UTC m=+0.123456789 container health_status 7d3f8a1b2c4e (image=us-east1-docker.pkg.dev/dev-blog-494815/blog/blog:prod, name=blog, health_status=healthy)
+same:83 ts=2026-10-26T05:00:13.123Z level=info msg="finished node evaluation" controller_path=/ controller_id="" node_id=loki.write.watchtower duration=1.2ms
+same:84 dnf5-automatic[1500]: Upgraded: podman-5:5.6.0-1.el10_1.x86_64
+same:85 {"level":"info","ts":1793018976.2,"logger":"tls","msg":"finished cleaning storage units"}
+same:86 Referrer-Policy: strict-origin-when-cross-origin
+keep:90 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"],"X-Auth-Token":["fakeLEAK90"],"X-Api-Key":["fakeLEAK91"],"X-Csrf-Token":["fakeLEAK92"],"X-Session-Id":["fakeLEAK93","fakeLEAK94"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:91 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"],"X-Authorization":["Basic fakeLEAK95"],"X-Forwarded-Authorization":["Basic fakeLEAK96"],"X-Forwarded-Cookie":["sid=fakeLEAK97"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:92 {"X-Authorization":"Basic fakeLEAK98","x-goog-authorization":"ab\"fakeLEAK99"}
+keep:93 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"],"X-Api-Key":["fake]LEAK100","a\"]fakeLEAK101"],"Cookie":["a=\"]fakeLEAK102"],"Authorization":["Basic \"]fakeLEAK103"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:94 {"password":"ab\"fakeLEAK104","cookie":"ab\"fakeLEAK105","cookies":{"a}b":"fakeLEAK106}fakeLEAK107"}}
+keep:95 {"password":8675309,"token":-31415926,"session_ttl":271828.0,"secret":["fakeLEAK108"],"credentials":[1,"fakeLEAK109",2]}
+keep:96 {"session":{"id":"fakeLEAK110","user":"fakeLEAK111"}}
+keep:97 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/?password=fakeLEAK112,fakeLEAK113;fakeLEAK114(fakeLEAK115&token=fakeLEAK116;fakeLEAK117&page=2","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:98 {"level":"info","ts":1793018979.1,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"203.0.113.90","remote_port":"40312","client_ip":"203.0.113.90","proto":"HTTP/2.0","method":"GET","host":"blog.example.org","uri":"/?password=\"fakeLEAK118\"&secret='fakeLEAK119'&page=2","headers":{"User-Agent":["Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"]}},"bytes_read":0,"duration":0.0123,"size":512,"status":200,"resp_headers":{"Server":["Caddy"]}}
+keep:99 login password=fakeLEAK120,fakeLEAK121 user=bob
+keep:100 token=fakeLEAK122;fakeLEAK123 (retrying)
+keep:101 password=(fakeLEAK124) session: <fakeLEAK125>
+keep:102 login password="ab\"fakeLEAK126" user=bob
+keep:103 {"level":"error","msg":"bad body {\"password\":\"fakeLEAK127\",\"api_key\":\"ab\\\"fakeLEAK128\",\"session\":42424242,\"token\":[\"fakeLEAK129\"],\"Cookie\":\"fakeLEAK130\"} rejected"}
+keep:104 wg-quick[812]: Key is not the correct length or format: `fakeLEAK131AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+keep:105 wg-quick[812]: Line unrecognized: `Secre=fakeLEAK132'
+keep:106 wg-quick[812]: Line unrecognized: `Shared=fakeLEAK133'
+keep:107 PrivateKey = fakeLEAK134 PresharedKey = fakeLEAK135
+keep:108 {"preshared_key":"fakeLEAK136"}
+keep:109 X_Authorization: Basic fakeLEAK137
+keep:112 login secret='ab\'fakeLEAK138' user=bob
+keep:120 {"level":"error","logger":"http.handlers.waf","msg":"Coraza: Warning. [msg \"XSS\"] [data \"Matched Data: fakeLEAK140\"] [severity \"critical\"] [uri \"/\"] [msg_match_1 \"XSS\"] [data_match_1 \"Matched Data: fakeLEAK141\"]"}
+drop:121 {"msg":"Coraza: Warning. [data_match_1 \"Matched Data: fakeLEAK142\"]"}
+drop:122 Coraza: Warning. [data "Matched Data: fakeLEAK143"] and no severity after it
+keep:123 header was Basic fakeLEAK144Zm9vOmJhcg== rejected
+keep:124 sshd-session[2345]: Accepted publickey for root from 192.0.2.7 port 40122 ssh2: ED25519 SHA256:fakeLEAK145AbCdEfGhIjKl/+Mn0123
+keep:125 x-cookie-id: fakeLEAK146
+keep:126 Cookie2: sid=fakeLEAK147
+keep:127 login passphrase=fakeLEAK148 pass=fakeLEAK149 otp=fakeLEAK150 auth=fakeLEAK151 user=bob
+keep:128 <password>fakeLEAK152</password> <Token a="b">fakeLEAK153</Token> <pass>fakeLEAK154</pass>
+keep:129 sudo[1]: root : TTY=pts/0 ; PWD=/root ; USER=root ; COMMAND=/usr/bin/mysql --password fakeLEAK155 --token fakeLEAK156 --pass fakeLEAK157 --api-key "a fakeLEAK158"
+keep:130 {"Cmd":["app","--password","fakeLEAK159","--api-key","a fakeLEAK160"]}
+keep:131 headers=[('Cookie', 'sid=fakeLEAK161'), ('X-Api-Key', 'fakeLEAK162'), ('Authorization', 'Basic fakeLEAK163')]
+keep:132 app:fakeLEAK164@tcp(db.example.org:3306)/app and app:fakeLEAK165@unix(/run/db.sock)/app
+keep:133 host-192-0-2-205.isp.example.org and ec2-198-51-100-206.compute-1.amazonaws.com
+keep:134 GET /a?ip=2001%3Adb8%3A%3A205 HTTP/1.1
+drop:135 form password=&fakeLEAK166
+same:112 sysctl: net.ipv4.tcp_syncookies = 1
+same:113 bypass=1 compass=n passed=3 authenticated=true author=bob auth_method=publickey otp_enabled=true
+same:114 tests pass: 5 auth: ok pam_unix(sudo:auth): auth could not identify a user
+keep:122 sudo[4567]: root : TTY=pts/0 ; PWD=/root ; USER=root ; COMMAND=/usr/bin/true
+keep:310 sudo: pam_unix(sudo:session): session opened for user root(uid=0) by fixture(uid=3141592653)
+keep:311 sudo: pam_unix(sudo:auth): authentication failure; logname=fixture uid=3141592654 euid=3141592655 tty=/dev/pts/0 ruser=fixture rhost= user=fixture
+keep:312 systemd[1]: Started User Manager for UID 3141592656.
+keep:313 systemd[1]: Created slice user-3141592657.slice - User Slice.
+keep:314 podman[3120]: stat /run/user/3141592658/containers: no such file
+keep:315 app[1]: uid=1000000000 is the shortest that goes
+same:160 CRON[2001]: pam_unix(cron:session): session opened for user root(uid=0) by root(uid=0)
+same:161 systemd[1]: Started User Manager for UID 1000.
+same:162 systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+same:163 podman[3120]: stat /run/user/1000/containers: no such file
+same:164 app[1]: uid=999999999 gid=1000 request 4012345678 done
+keep:300 sudo[4567]: root : TTY=pts/0 ; PWD=/srv/app ; USER=svc ; ENV=MODE=fakeLEAK640 OTHER=fakeLEAK641 ; COMMAND=/usr/bin/fakeLEAK642 -pfakeLEAK643
+keep:301 sudo[4567]: root : TTY=unknown ; PWD=/ ; USER=svc ; GROUP=adm ; TSID=00000A ; ENV=PATH=/fakeLEAK644 ; COMMAND=/bin/sh -c 'echo fakeLEAK645'
+keep:302 sudo[4567]: root : (command continued) fakeLEAK646 the rest of a long one
+keep:303 sudo[4567]: root : TTY=pts/1 ; PWD=/srv/app ; USER=root ; COMMAND=/usr/bin/curl -u fakeLEAK647:fakeLEAK648 https://app.internal/
+same:170 app[1]: started ENV=production RUST_ENV=staging region=eu-central
+same:171 sudo: pam_unix(sudo:session): session closed for user root
+keep:320 pushed with ghp_fakeLEAK650fakefakefakefakefakefake now
+keep:321 called with ya29.fakeLEAK651-fake_fake.fakefakefake now # nosemgrep: generic.secrets.security.detected-google-oauth-access-token.detected-google-oauth-access-token
+keep:322 signed by AKIAFAKELEAK6520FAKE now
+keep:323 {"note":"x_ghp_fakeLEAK653fakefakefakefakefake"}
+keep:324 authorized ssh-ed25519 AAAAfakeLEAK654fakefakefakefakefakefake now
+keep:325 authorized ssh-rsa AAAAfakeLEAK655fakefake/+fakefakefake== now
+keep:326 authorized ecdsa-sha2-nistp256 AAAAfakeLEAK656fakefakefakefake now
+keep:327 two parts eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0 now # nosemgrep: generic.secrets.security.detected-jwt-token.detected-jwt-token
+keep:328 five parts eyJhbGciOiJSU0EifQ.fakeLEAK657key.fakeLEAK658iv.fakeLEAK659data.fakeLEAK660tag now # nosemgrep: generic.secrets.security.detected-jwt-token.detected-jwt-token
+keep:329 five parts eyJhbGciOiJkaXIifQ..fakeLEAK661iv.fakeLEAK662data.fakeLEAK663tag now
+keep:330 sshd[99]: key SHA1:fakeLEAK664AbCdEfGhIjKl/+Mn0
+keep:331 sshd[99]: key SHA-256:fakeLEAK665AbCdEfGhIjKlMnOpQrStUvWxYz/+01234
+keep:332 tls[99]: cert SHA1:fakeLEAK666:aa:bb:cc:dd:ee:ff
+same:180 git[1]: HEAD is now at 4b825dc642cb6eb9a060e54bf8d69288fbee4904 on main
+same:181 gitea[1]: pushed SHA1:4b825dc642cb6eb9a060e54bf8d69288fbee4904 to main
+same:182 tool[1]: file SHA-256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b ok
+same:183 dnf[812]: Downloading successful, but checksum doesn't match. Calculated: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b(sha256) Expected: 3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b(sha256)
+same:184 dnf[812]: Header SHA256 digest: OK Header SHA1 digest: OK Payload SHA256 digest: OK
+same:185 dnf[812]: pulled sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b and sha1:4b825dc642cb6eb9a060e54bf8d69288fbee4904
+same:186 sshd[12]: userauth_pubkey: key type ssh-rsa not in PubkeyAcceptedAlgorithms [preauth]
+same:187 sshd[12]: host keys are ssh-ed25519, ssh-rsa and ecdsa-sha2-nistp256
+same:188 app[1]: prefix ghp_ or ya29. or AKIA is no token, nor is AKIAONLYSHORT
+same:189 app[1]: blob eyJmYWtlIjoiZGF0YSJ9 has no dot
+keep:316 systemd[1]: Started user@3141592650.service - User Manager for UID 3141592651.
+keep:317 systemd[1]: Starting user-runtime-dir@3141592652.service - User Runtime Directory /run/user/3141592659...
+keep:318 systemd[1]: user@1000000000.service: Consumed 1.234s CPU time.
+same:190 systemd[1]: Started user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+same:191 systemd[1]: user@999999999.service: Consumed 1.234s CPU time.
+same:110 wg-quick[812]: Configuration parsing error
+same:111 {"level":"info","logger":"http.log.access.log0","request":{"method":"GET","uri":"/?page=2&q=a,b;c(d","headers":{"Accept":["*/*"]}},"status":200}

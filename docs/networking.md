@@ -47,6 +47,42 @@ table on EL, including netavark's, which silently drops the container port
 forwards until the containers restart. `vm/bootstrap.sh` already does it the
 safe way on each sync.
 
+## Out to watchtower
+
+Logs and metrics leave through a WireGuard tunnel, `wg-watchtower`, to
+watchtower's VPN (see the runbook's Telemetry section):
+
+```
+Alloy (host network) ──► wg-watchtower (10.8.0.134) ──► UDP to the proxy ──► 10.8.0.1: Loki :3100, Mimir :8080
+```
+
+- **Split, so the VM's own traffic never moves.** The tunnel routes
+  10.8.0.0/24 and nothing else. A full tunnel would send the metadata
+  server (169.254.169.254) to the proxy and take the VM's credentials,
+  image pulls and DNS-01 down with it, so `vm/bootstrap.sh` refuses any
+  config that would route more, or that carries hooks.
+- **Outbound only.** The VM dials the proxy; replies come back on the
+  established connection (the keepalive keeps the conntrack entry alive),
+  so no port opens in the VPC firewall. nftables has no rule of its own
+  for the tunnel: traffic arriving on it meets the same input rules as the
+  internet.
+- **Write only.** At the other end, watchtower lets this peer reach only
+  its ingest listeners and write paths, in the tenant `jasonmross`.
+- **Alloy keeps off the metadata server.** Its token is this VM's
+  credentials, and Alloy has no use for it, so `host.nft`'s output chain
+  refuses uid 473 there. Port 53 still goes through: that address is also
+  GCE's resolver, and Alloy has to look up watchtower. One uid and no more,
+  since Caddy needs the server for DNS-01 and root for `gcloud`. This holds
+  because Alloy is on the host network with no user namespace, so its
+  packets leave through the output chain under that uid; a bridged
+  container's are forwarded and never meet it.
+  `scripts/check-metadata-guard.sh` loads the ruleset in a throwaway
+  namespace and checks who gets through.
+- **Loopback listeners.** Caddy's metrics (`:2020`) are on the host's
+  loopback in either Caddy mode: bound there on the host network, published
+  as `127.0.0.1:2020` from the bridge. Alloy's UI is `127.0.0.1:12345`.
+  Caddy's admin API (`:2019`) is on loopback and never published.
+
 ## Admin access
 
 There is no public SSH. `make ssh` runs

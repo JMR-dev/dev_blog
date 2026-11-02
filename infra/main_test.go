@@ -119,7 +119,8 @@ func TestDefaults(t *testing.T) {
 			t.Errorf("metadata %s = %q, want %q", k, got, v)
 		}
 	}
-	for _, k := range []string{"startup-script", "acme-email"} {
+	// No peer configured, no key: the VM then keeps the tunnel and Alloy down.
+	for _, k := range []string{"startup-script", "acme-email", "watchtower-peer-secret"} {
 		if _, ok := md[resource.PropertyKey(k)]; ok {
 			t.Errorf("metadata must not carry %s", k)
 		}
@@ -189,6 +190,23 @@ func TestDNSScope(t *testing.T) {
 	}
 }
 
+// The watchtower peer goes to the VM by name only: the metadata carries the
+// secret's id, the VM reads the value as its own service account, and this
+// program grants nothing for it (watchtower's bootstrap.sh does, in its own
+// project).
+func TestWatchtowerPeer(t *testing.T) {
+	m := run(t, map[string]string{"blog:watchtowerPeerSecret": "wireguard-blog-vm-peer"})
+	md := byType(m, "gcp:compute/instance:Instance")[0].inputs["metadata"].ObjectValue()
+	if got := md["watchtower-peer-secret"].StringValue(); got != "wireguard-blog-vm-peer" {
+		t.Errorf("metadata watchtower-peer-secret = %q", got)
+	}
+	for _, r := range byType(m, "gcp:secretmanager/secretIamMember:SecretIamMember") {
+		if id := r.inputs["secretId"].StringValue(); strings.Contains(id, "wireguard") {
+			t.Errorf("unexpected grant on %s: the peer's secret is not this project's", id)
+		}
+	}
+}
+
 func TestValidation(t *testing.T) {
 	for _, c := range []map[string]string{
 		{"blog:appPort": "443"},
@@ -196,6 +214,7 @@ func TestValidation(t *testing.T) {
 		{"blog:wafMode": "Block"},
 		{"blog:healthPath": "healthz"},
 		{"blog:zone": "us-west1-a"},
+		{"blog:watchtowerPeerSecret": "projects/watchtower-observe/secrets/wireguard-blog-vm-peer"},
 	} {
 		if _, err := runErr(t, cfgWith(c)); err == nil {
 			t.Errorf("%v: want a validation error", c)

@@ -17,6 +17,15 @@ readonly INSTALLED=/usr/local/sbin/blog-bootstrap
 readonly DATA_DIR=/var/lib/blog
 readonly LOG_TAG=blog-bootstrap
 
+# The watchtower VPN (render_telemetry). Fixed by watchtower's contract
+# (watchtower-observability-stack, docs/client-telemetry.md), not by this
+# deployment.
+readonly WATCHTOWER_PROJECT=watchtower-observe
+readonly WG_IFACE=wg-watchtower
+readonly WG_DIR=/etc/wireguard
+readonly WG_CONF=${WG_DIR}/wg-watchtower.conf
+readonly ALLOY_CONF=/etc/blog/alloy/config.alloy
+
 log()  { echo "[${LOG_TAG}] $*" >&2; }
 die()  { echo "[${LOG_TAG}] FATAL: $*" >&2; exit 1; }
 warn() { echo "[${LOG_TAG}] WARN: $*" >&2; }
@@ -30,6 +39,20 @@ MODE=full
 meta() {
     curl -fsS -H 'Metadata-Flavor: Google' \
         "http://169.254.169.254/computeMetadata/v1/instance/attributes/$1" 2>/dev/null || true
+}
+
+# For the peer secret's name, where "not set" stops the tunnel. A 404 is not
+# set, and prints nothing. Anything else the server fails to answer returns 1,
+# so a failed read never counts as no peer.
+meta_or_fail() {
+    local out
+    out=$(curl -sS -m 10 --retry 2 -w '\n%{http_code}' -H 'Metadata-Flavor: Google' \
+        "http://169.254.169.254/computeMetadata/v1/instance/attributes/$1" 2>/dev/null) || return 1
+    case "${out##*$'\n'}" in
+        200) printf '%s' "${out%$'\n'*}" ;;
+        404) ;;
+        *) return 1 ;;
+    esac
 }
 
 CONFIG_BUCKET=$(meta config-bucket)
@@ -47,6 +70,10 @@ PODMAN_GATEWAY=$(meta podman-gateway)
 WAF_MODE=$(meta waf-mode)
 DATA_DISK_DEVICE=$(meta data-disk-device)
 SECRET_NAMES=$(meta secret-names)
+# A secret's name in WATCHTOWER_PROJECT, never its value. Empty: no telemetry.
+# PEER_META_READ=0: the metadata server didn't say, so nothing is known.
+PEER_META_READ=1
+WATCHTOWER_PEER_SECRET=$(meta_or_fail watchtower-peer-secret) || PEER_META_READ=0
 
 [[ -n "${CONFIG_BUCKET}" ]] || die "config-bucket metadata is missing; nothing to sync from"
 [[ -n "${DOMAIN}"        ]] || die "domain metadata is missing"
@@ -124,6 +151,32 @@ install_packages() {
     else
         warn "fail2ban not installable from configured repos -- skipping fail2ban setup"
     fi
+
+    # The watchtower tunnel, and rotation for the Coraza audit log. Apart from
+    # the line above, so a missing package never stops the site's boot. Sync
+    # runs install them too (render_telemetry, setup_caddy_logs), since a sync
+    # skips this function.
+    dnf -y install wireguard-tools logrotate || warn "wireguard-tools or logrotate not installable"
+}
+
+# ---------------------------------------------------------------------------
+# Journal
+# ---------------------------------------------------------------------------
+# Persistent, so nothing logged before Alloy starts is lost to a reboot and its
+# cursor (alloy-data.volume) still points into the journal; capped, so the boot
+# disk keeps its room. Runs in both modes, like the firewall: a pushed change
+# applies on the next sync.
+setup_journald() {
+    local conf=/etc/systemd/journald.conf.d/50-blog.conf
+    if cmp -s "${STATE_DIR}/journald/50-blog.conf" "${conf}"; then
+        return 0
+    fi
+    log "configuring journald"
+    install -d -m 0755 /etc/systemd/journald.conf.d
+    install -m 0644 "${STATE_DIR}/journald/50-blog.conf" "${conf}"
+    systemctl restart systemd-journald || warn "journald did not restart"
+    # Moves anything still in /run/log/journal to /var/log/journal.
+    journalctl --flush || warn "journal flush failed"
 }
 
 # ---------------------------------------------------------------------------
@@ -468,15 +521,21 @@ render_all() {
         # secrets would be far worse than doing nothing; the next sync retries.
         warn "required secrets unavailable -- skipping config render (will retry on the next sync)"
         unset "${SECRET_ENV_NAMES[@]}"
+        # Telemetry doesn't wait for the app's secrets.
+        render_telemetry
         return 0
     fi
 
-    local caddy_mode caddy_network caddy_publish caddy_sysctl app_upstream
+    # caddy_metrics_bind: where the Caddyfile's :2020 metrics site listens.
+    # Loopback on the host network; on the bridge, inside the container,
+    # published on the host's loopback only.
+    local caddy_mode caddy_network caddy_publish caddy_sysctl caddy_metrics_bind app_upstream
     caddy_mode=$(probe_caddy_network)
     if [[ "${caddy_mode}" == "host" ]]; then
         caddy_network="host"
         caddy_publish="# Network=host: ports are bound directly, publishing would be invalid."
         caddy_sysctl="# Network=host: podman rejects net.* sysctls; set on the host instead."
+        caddy_metrics_bind="bind 127.0.0.1"
         app_upstream="127.0.0.1:${APP_PORT}"
         # Container-local sysctls are unavailable on the host network, so allow
         # unprivileged binds to 80/443 host-wide. Narrower than granting the
@@ -485,8 +544,9 @@ render_all() {
         sysctl -q -p /etc/sysctl.d/90-blog-caddy.conf || warn "could not apply unprivileged port sysctl"
     else
         caddy_network="blog.network"
-        caddy_publish=$'PublishPort=80:80\nPublishPort=443:443\nPublishPort=443:443/udp'
+        caddy_publish=$'PublishPort=80:80\nPublishPort=443:443\nPublishPort=443:443/udp\nPublishPort=127.0.0.1:2020:2020'
         caddy_sysctl="Sysctl=net.ipv4.ip_unprivileged_port_start=0"
+        caddy_metrics_bind="# bridge: caddy.container publishes this on the host's loopback only"
         app_upstream="blog:${APP_PORT}"
         rm -f /etc/sysctl.d/90-blog-caddy.conf
     fi
@@ -512,7 +572,11 @@ render_all() {
            CADDY_NETWORK="${caddy_network}" \
            CADDY_PUBLISH_PORTS="${caddy_publish}" \
            CADDY_SYSCTL="${caddy_sysctl}" \
+           CADDY_METRICS_BIND="${caddy_metrics_bind}" \
            CADDY_EMAIL="${caddy_email}"
+
+    # Before Caddy restarts with the directory mounted.
+    setup_caddy_logs
 
     local changed=0
 
@@ -530,9 +594,11 @@ render_all() {
         && changed=1
 
     render "${STATE_DIR}/config/Caddyfile.tmpl" /etc/caddy/Caddyfile root:root 0644 \
-        '${DOMAIN} ${CADDY_EMAIL} ${APP_UPSTREAM} ${WAF_MODE}' \
+        '${DOMAIN} ${CADDY_EMAIL} ${APP_UPSTREAM} ${WAF_MODE} ${CADDY_METRICS_BIND}' \
         && changed=1
 
+    # The site's units only: alloy.container and alloy-data.volume are
+    # render_telemetry's, so they never restart the blog or Caddy.
     local unit
     for unit in blog.network blog.container caddy.container caddy-data.volume caddy-config.volume; do
         render "${STATE_DIR}/quadlets/${unit}" "${RENDER_DIR}/${unit}" root:root 0644 \
@@ -559,6 +625,336 @@ render_all() {
         systemctl restart caddy.service || warn "caddy did not restart cleanly"
     else
         log "configuration unchanged"
+    fi
+
+    # Last, and on its own changed flag: the tunnel and Alloy never restart the
+    # site. Their slow first deploy (dnf, a 213 MiB image pull) comes after the
+    # site's restart, because that flag lives only in this run: if the sync's
+    # TimeoutStartSec killed us between rendering and restarting, the retry
+    # would see nothing changed and Caddy would stay on its old config.
+    render_telemetry
+}
+
+# ---------------------------------------------------------------------------
+# Coraza's audit log
+# ---------------------------------------------------------------------------
+# A record holds a whole request -- headers, cookies, bodies -- so Caddy
+# writes it to a file on this host (SecAuditLog in Caddyfile.tmpl, mounted by
+# caddy.container), never the journal, which Alloy ships to watchtower. Caddy's
+# uid owns the directory and nobody else may read it: Alloy, with / mounted
+# read-only, runs as another uid.
+setup_caddy_logs() {
+    install -d -o 1000 -g 1000 -m 0750 /var/log/caddy
+    if ! rpm -q logrotate >/dev/null 2>&1; then
+        dnf -y install logrotate || warn "logrotate not installable; the Coraza audit log will not rotate"
+    fi
+    install -m 0644 "${STATE_DIR}/logrotate/coraza-audit" /etc/logrotate.d/coraza-audit
+    systemctl enable --now logrotate.timer >/dev/null 2>&1 || warn "logrotate.timer not enabled"
+}
+
+# ---------------------------------------------------------------------------
+# Telemetry: the watchtower tunnel and Alloy
+# ---------------------------------------------------------------------------
+# This VM is one of watchtower's agent peers (watchtower-observability-stack,
+# docs/client-telemetry.md): a split WireGuard tunnel, wg-watchtower, to
+# 10.8.0.0/24 only, through which Alloy (vm/quadlets/alloy.container) pushes
+# the journal and metrics. The peer config is the secret named by the
+# watchtower-peer-secret metadata, in project watchtower-observe, which only
+# this VM's service account may read.
+#
+# Both have a changed flag of their own and restart only each other, never the
+# site, and render after it.
+#
+# Only no peer takes them down: the metadata unset, or the secret missing or
+# empty. That is a warning, not a failure: the tunnel and Alloy stop and their
+# config goes. Anything else (the metadata server not answering, any other
+# error reading the secret, a config refused) warns and leaves them running as
+# they are, so an outage at Secret Manager doesn't stop the logs. Revoking a
+# peer is done by deleting its client in wg-easy, never from here.
+#
+# The peer config holds this VM's WireGuard private key, and this script's
+# output reaches the serial console and Cloud Logging at boot. So the config
+# only ever moves between files in /etc/wireguard (root, 0700), is checked
+# with commands that print nothing from it, and nothing here echoes it. Never
+# run this script with -x.
+
+# Set by render_telemetry for check_telemetry.
+TELEMETRY_ON=0
+# Why fetch_peer returned 1: words of ours, nothing from gcloud.
+PEER_FETCH_ERROR=""
+
+# Stops and removes the tunnel and Alloy. $1 says why, with nothing from the
+# secret in it. A warning, unless $2 is "quiet" (no peer configured, on
+# purpose) and there is nothing left to stop.
+telemetry_off() {
+    local was_on=0
+    # A run that died half-way can leave the raw config here, private key and
+    # all.
+    rm -f "${WG_DIR}"/.peer-*
+    [[ -f "${WG_CONF}" || -f "${RENDER_DIR}/alloy.container" ]] && was_on=1
+    if [[ "${2:-}" == quiet ]] && (( ! was_on )); then
+        log "watchtower telemetry off: $1"
+        return 0
+    fi
+    warn "watchtower telemetry off: $1"
+    systemctl stop alloy.service >/dev/null 2>&1 || true
+    # Its oneshot unit would linger as not-found until a reboot. Stopping it
+    # leaves the volume, and with it the journal position, on disk.
+    systemctl stop alloy-data-volume.service >/dev/null 2>&1 || true
+    systemctl disable --now "wg-quick@${WG_IFACE}.service" >/dev/null 2>&1 || true
+    rm -f "${WG_CONF}" "${ALLOY_CONF}" "${RENDER_DIR}/alloy.container" "${RENDER_DIR}/alloy-data.volume"
+    if (( was_on )); then
+        systemctl daemon-reload
+    fi
+}
+
+# Checks the peer config in $1 and writes it, normalised, to $2. Returns 1,
+# writing nothing, on a config to refuse. Prints nothing from either file.
+#
+# Watchtower's deploy pins all of this before it publishes, but the file runs
+# here as root (wg-quick runs its hooks), so check again. A wider route, or an
+# address over the metadata server's, would send 169.254.169.254 into the
+# tunnel and take the VM's credentials, image pulls and DNS-01 with it.
+#
+# wg-quick and wg don't read a line as written: wg deletes every blank in it
+# (`Allowed IPs` is AllowedIPs, `[ Peer ]` is [Peer]) and bash's read drops NUL
+# bytes (`Post\0Up` is PostUp). So nothing but printable ASCII, tabs and
+# newlines gets in, each line is judged the way wg reads it (cut at "#", blanks
+# gone, keys in any case), and the output is written afresh from the values
+# checked, so nothing else in the file reaches wg-quick:
+#   - one [Interface], then one [Peer];
+#   - PrivateKey, PublicKey and an optional PresharedKey, each a well-formed
+#     key: wg prints a bad one whole in its error, and that goes to the journal;
+#   - Address, a /32 in the agent half (10.8.0.128/25);
+#   - AllowedIPs, exactly 10.8.0.0/24, and an Endpoint;
+#   - MTU and PersistentKeepalive, which watchtower sets: 1380 and 25 if missing;
+#   - DNS is dropped: the tunnel is split, and the host keeps its own resolver.
+# Any other key is refused: PreUp, PostUp, PreDown, PostDown (commands wg-quick
+# runs), Table, FwMark, SaveConfig, and whatever else may come along.
+check_peer() {
+    local src="$1" dst="$2"
+    [[ $(LC_ALL=C tr -d '\t\n\040-\176' < "${src}" | wc -c) -eq 0 ]] || return 1
+    # END writes the file, so a refusal writes nothing. A key decodes to 32
+    # bytes, so its 43rd character has its last two bits clear; wg checks that.
+    LC_ALL=C awk '
+        function refuse() { bad = 1; exit 1 }
+        function is_key(v) {
+            return length(v) == 44 && v ~ /^[A-Za-z0-9+\/]+[AEIMQUYcgkosw048]=$/
+        }
+        {
+            line = $0
+            sub(/#.*/, "", line)
+            gsub(/[ \t]/, "", line)
+            if (line == "") next
+            lower = tolower(line)
+            if (lower == "[interface]") {
+                if (section != "") refuse()
+                section = "interface"
+                next
+            }
+            if (lower == "[peer]") {
+                if (section != "interface") refuse()
+                section = "peer"
+                next
+            }
+            eq = index(line, "=")
+            if (eq < 2 || section == "") refuse()
+            key = section "/" substr(lower, 1, eq - 1)
+            value = substr(line, eq + 1)
+            if (key == "interface/dns") next
+            if (key in conf) refuse()
+            if (key == "interface/privatekey" || key == "peer/publickey" || key == "peer/presharedkey") {
+                if (!is_key(value)) refuse()
+            } else if (key == "interface/address") {
+                if (value !~ /^10\.8\.0\.(12[89]|1[3-9][0-9]|2[0-4][0-9]|25[0-4])\/32$/) refuse()
+            } else if (key == "peer/allowedips") {
+                if (value != "10.8.0.0/24") refuse()
+            } else if (key == "peer/endpoint") {
+                if (value !~ /^([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\]):[0-9]+$/) refuse()
+            } else if (key == "interface/mtu" || key == "peer/persistentkeepalive") {
+                if (value !~ /^[0-9]+$/) refuse()
+            } else {
+                refuse()
+            }
+            conf[key] = value
+        }
+        END {
+            if (bad || section != "peer") exit 1
+            if (!("interface/privatekey" in conf) || !("interface/address" in conf) \
+                || !("peer/publickey" in conf) || !("peer/allowedips" in conf) \
+                || !("peer/endpoint" in conf)) exit 1
+            print "[Interface]"
+            print "PrivateKey = " conf["interface/privatekey"]
+            print "Address = " conf["interface/address"]
+            print "MTU = " (("interface/mtu" in conf) ? conf["interface/mtu"] : 1380)
+            print ""
+            print "[Peer]"
+            print "PublicKey = " conf["peer/publickey"]
+            if ("peer/presharedkey" in conf) print "PresharedKey = " conf["peer/presharedkey"]
+            print "AllowedIPs = " conf["peer/allowedips"]
+            print "PersistentKeepalive = " (("peer/persistentkeepalive" in conf) ? conf["peer/persistentkeepalive"] : 25)
+            print "Endpoint = " conf["peer/endpoint"]
+        }
+    ' "${src}" > "${dst}"
+}
+
+# Leaves the tunnel and Alloy as they are. $1 says why, with nothing from the
+# secret in it. If there is a config, check_telemetry still says whether they
+# are up.
+telemetry_leave() {
+    warn "watchtower telemetry left as it is: $1"
+    if [[ -f "${WG_CONF}" ]]; then
+        TELEMETRY_ON=1
+    fi
+}
+
+# Reads the peer config into the file $1. Returns 0 with it there, 2 when the
+# secret or its version is missing or the value is empty, and 1 on any other
+# error, naming it in PEER_FETCH_ERROR.
+#
+# The value goes only to the file. gcloud's stderr goes only to this variable,
+# which is matched and never printed: nothing from this call may reach the boot
+# output.
+fetch_peer() {
+    local err
+    if err=$(gcloud secrets versions access latest --secret="${WATCHTOWER_PEER_SECRET}" \
+            --project="${WATCHTOWER_PROJECT}" 2>&1 >"$1"); then
+        [[ -s "$1" ]] || return 2
+        return 0
+    fi
+    case "${err}" in
+        *NOT_FOUND*) return 2 ;;
+        *PERMISSION_DENIED*) PEER_FETCH_ERROR="permission denied" ;;
+        *) PEER_FETCH_ERROR="a network, API or credentials error" ;;
+    esac
+    return 1
+}
+
+# Installs the tunnel config and renders Alloy, restarting either only when it
+# changed.
+render_telemetry() {
+    TELEMETRY_ON=0
+    if (( ! PEER_META_READ )); then
+        telemetry_leave "the metadata server did not answer for watchtower-peer-secret"
+        return 0
+    fi
+    if [[ -z "${WATCHTOWER_PEER_SECRET}" ]]; then
+        telemetry_off "no watchtower-peer-secret metadata (blog:watchtowerPeerSecret)" quiet
+        return 0
+    fi
+    if ! rpm -q wireguard-tools >/dev/null 2>&1 && ! dnf -y install wireguard-tools; then
+        telemetry_leave "wireguard-tools is not installable"
+        return 0
+    fi
+
+    local raw conf fetched=0 journal_gid tunnel_changed=0 alloy_changed=0
+    install -d -o root -g root -m 0700 "${WG_DIR}"
+    # Left behind only if a run died half-way.
+    rm -f "${WG_DIR}"/.peer-*
+    # mktemp makes both 0600, in the 0700 directory: the config never touches
+    # /tmp, a variable or the output.
+    raw=$(mktemp "${WG_DIR}/.peer-raw.XXXXXX")
+    conf=$(mktemp "${WG_DIR}/.peer-conf.XXXXXX")
+    fetch_peer "${raw}" || fetched=$?
+    if (( fetched == 2 )); then
+        rm -f "${raw}" "${conf}"
+        telemetry_off "secret ${WATCHTOWER_PEER_SECRET} in ${WATCHTOWER_PROJECT} is missing or empty"
+        return 0
+    fi
+    if (( fetched != 0 )); then
+        rm -f "${raw}" "${conf}"
+        telemetry_leave "could not read secret ${WATCHTOWER_PEER_SECRET} in ${WATCHTOWER_PROJECT}: ${PEER_FETCH_ERROR}"
+        return 0
+    fi
+    if ! check_peer "${raw}" "${conf}"; then
+        rm -f "${raw}" "${conf}"
+        telemetry_leave "the peer config in ${WATCHTOWER_PEER_SECRET} failed its checks (a split tunnel, no hooks, well-formed keys); refused"
+        return 0
+    fi
+    rm -f "${raw}"
+
+    # Alloy reads the journal as the image's own uid plus this group. Before
+    # the config goes in, so a new one is never left there unapplied.
+    journal_gid=$(getent group systemd-journal | cut -d: -f3) || journal_gid=""
+    if [[ -z "${journal_gid}" ]]; then
+        rm -f "${conf}"
+        telemetry_leave "no systemd-journal group"
+        return 0
+    fi
+
+    if [[ -f "${WG_CONF}" ]] && cmp -s "${conf}" "${WG_CONF}"; then
+        rm -f "${conf}"
+    else
+        mv -f "${conf}" "${WG_CONF}"
+        restorecon -F "${WG_CONF}" >/dev/null 2>&1 || true
+        log "installed the watchtower tunnel config"
+        tunnel_changed=1
+    fi
+
+    export JOURNAL_GID="${journal_gid}"
+    mkdir -p "$(dirname "${ALLOY_CONF}")"
+    render "${STATE_DIR}/config/config.alloy.tmpl" "${ALLOY_CONF}" root:root 0644 \
+        '${DOMAIN} ${HEALTH_PATH}' && alloy_changed=1
+    local unit units_changed=0
+    for unit in alloy.container alloy-data.volume; do
+        render "${STATE_DIR}/quadlets/${unit}" "${RENDER_DIR}/${unit}" root:root 0644 \
+            '${JOURNAL_GID}' && units_changed=1
+    done
+    if (( units_changed )); then
+        systemctl daemon-reload
+        alloy_changed=1
+    fi
+
+    TELEMETRY_ON=1
+    systemctl enable "wg-quick@${WG_IFACE}.service" >/dev/null 2>&1 \
+        || warn "could not enable wg-quick@${WG_IFACE}"
+    if (( tunnel_changed )); then
+        # Restart, not `wg syncconf`: a changed Address or Endpoint needs
+        # wg-quick.
+        systemctl restart "wg-quick@${WG_IFACE}.service" || warn "the watchtower tunnel did not come up"
+    else
+        systemctl start "wg-quick@${WG_IFACE}.service" || warn "the watchtower tunnel did not come up"
+    fi
+    # Quadlet units have no enable: [Install] takes effect at daemon-reload.
+    if (( alloy_changed || tunnel_changed )); then
+        log "the watchtower tunnel or Alloy changed -- restarting Alloy"
+        systemctl restart alloy.service || warn "Alloy did not restart cleanly"
+    else
+        systemctl start alloy.service || warn "Alloy did not start"
+    fi
+}
+
+# The deploy check, warn only: Alloy answers /-/ready, and the tunnel has a
+# handshake within 2 minutes. `wg show` prints the peer's public key in its
+# first field, so only the second, the time, is read.
+check_telemetry() {
+    (( TELEMETRY_ON )) || return 0
+    local ready=0 handshake=0 latest
+    for _ in $(seq 1 24); do
+        if (( ! ready )) && curl -fsS -m 5 -o /dev/null http://127.0.0.1:12345/-/ready 2>/dev/null; then
+            ready=1
+        fi
+        if (( ! handshake )); then
+            latest=$(wg show "${WG_IFACE}" latest-handshakes 2>/dev/null | awk '{ print $2 }' | sort -n | tail -n 1) \
+                || latest=""
+            if [[ "${latest}" =~ ^[0-9]+$ ]] && (( latest > 0 )); then
+                handshake=1
+            fi
+        fi
+        if (( ready && handshake )); then
+            break
+        fi
+        sleep 5
+    done
+    if (( ready )); then
+        log "Alloy is ready"
+    else
+        warn "Alloy did not answer /-/ready within 2 minutes (journalctl -u alloy)"
+    fi
+    if (( handshake )); then
+        log "the watchtower tunnel has a handshake"
+    else
+        warn "no handshake on ${WG_IFACE} within 2 minutes (journalctl -u wg-quick@${WG_IFACE})"
     fi
 }
 
@@ -668,12 +1064,17 @@ main() {
     # idempotent and self-validating.
     setup_nftables
     setup_fail2ban
+    setup_journald
 
     render_all
 
     if [[ "${MODE}" == "full" ]]; then
         setup_auto_updates
         enable_units
+    else
+        # A sync is a deploy: say whether telemetry flows. Not on boot, where
+        # it would only hold up the rest of the startup script.
+        check_telemetry
     fi
 
     log "done"
