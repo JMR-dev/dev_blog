@@ -41,3 +41,6 @@ fake\]LEAK
 2001%3A
 "[A-Za-z-]*([Cc]ookie|[Aa]uthorization)": *\[?"
 \\"[A-Za-z_-]*([Cc]ookie|[Pp]assword|[Tt]oken|[Ss]ession|[Kk]ey)\\": *(\[\\"|\\")
+uid=1000000000
+314159265[0-9]
+@1000000000

@@ -198,7 +198,7 @@ contract; this deployment implements it:
   reads the persistent journal (every unit, the site and Caddy included)
   and scrubs it before anything leaves the host (`vm/config/config.alloy.tmpl`:
   IPs, Referer, the WAF's matched data, emails, credentials, OS Login
-  names...), and scrapes the host, itself, Caddy's `127.0.0.1:2020` and a
+  names and uids, what sudo ran...), and scrapes the host, itself, Caddy's `127.0.0.1:2020` and a
   probe of the public site every 60 s. Everything is labelled
   `service=blog`, `host=blog-vm`, `env=production`. Its uid, 473, can't reach
   the metadata server except for DNS (`vm/nftables/host.nft`, its output chain;
@@ -215,8 +215,10 @@ contract; this deployment implements it:
   rules marked in it are the blog's. A change for every service belongs in
   watchtower's first. Add made-up lines to `scripts/testdata/scrub.log`
   (`keep:`, `same:` or `drop:`; `scrub.caddy.log` for what only Caddy's JSON
-  check decides) and what must never come out to `scrub.forbidden`, then
-  `make check-alloy` (needs `alloy` v1.21.2 and `jq`).
+  check decides) and what must never come out to `scrub.forbidden`. Whole
+  lines as they must come out go in `scrub.expect`, and unit labels going in
+  and coming out in `scrub.units`. Then `make check-alloy` (needs `alloy`
+  v1.21.2 and `jq`).
   `SCRUB_SHOW=1 scripts/check-alloy-scrub.sh` prints what would ship.
 - **Off:** remove `blog:watchtowerPeerSecret` from `infra/Pulumi.prod.yaml`
   and merge. The sync stops the tunnel and Alloy and removes their config.
