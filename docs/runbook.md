@@ -225,8 +225,9 @@ contract; this deployment implements it:
   **Only those.** The metadata server not answering, any other error reading
   the secret (network, 5xx, token, `PERMISSION_DENIED`) or a config refused
   warns and leaves the tunnel and Alloy running on the config they have. So
-  deleting the secret itself doesn't stop them: `blog-vm@` is granted on that
-  secret, so a deleted one answers `PERMISSION_DENIED`, not `NOT_FOUND`.
+  deleting the secret itself is no way to stop them: `blog-vm@` is granted on
+  that secret alone, so a deleted one will most likely answer
+  `PERMISSION_DENIED`, not `NOT_FOUND`.
 - **Revoking:** delete the `blog-vm` client in wg-easy. That ends the tunnel
   from the far end, whatever this VM is doing.
 - **Rekeying:** delete the `blog-vm` client in wg-easy; watchtower's next
