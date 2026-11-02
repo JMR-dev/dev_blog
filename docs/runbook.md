@@ -200,7 +200,9 @@ contract; this deployment implements it:
   IPs, Referer, the WAF's matched data, emails, credentials, OS Login
   names...), and scrapes the host, itself, Caddy's `127.0.0.1:2020` and a
   probe of the public site every 60 s. Everything is labelled
-  `service=blog`, `host=blog-vm`, `env=production`.
+  `service=blog`, `host=blog-vm`, `env=production`. Its uid, 473, can't reach
+  the metadata server except for DNS (`vm/nftables/host.nft`, its output chain;
+  `sudo nft list chain inet blog_filter output` counts the refusals).
 - **Not the site.** The tunnel and Alloy restart only when their own
   config changed, never with the blog or Caddy, and an OOM kills Alloy, not
   the site.
@@ -232,7 +234,8 @@ contract; this deployment implements it:
   (`make sync`) or boot.
 - **Alloy upgrades:** watchtower's contract pins the version. Change the
   tag and digest in `vm/quadlets/alloy.container` and the version and
-  sha256 in the pipeline's infra-check job together.
+  sha256 in the pipeline's infra-check job together. If a new image runs as
+  another uid, `make check-metadata-guard` fails until `host.nft` matches.
 
 ### Checking it
 

@@ -9,6 +9,9 @@
 # The keys are dummies built here, so no key-shaped text sits in the repo.
 # `make check-peer` runs it. Needs only awk and coreutils.
 
+# Functions sourced from bootstrap.sh read many of the variables set below.
+# shellcheck disable=SC2034
+
 set -euo pipefail
 # So `... | refuse` below runs in this shell, and its verdict counts.
 shopt -s lastpipe
@@ -199,20 +202,17 @@ for fn in meta_or_fail telemetry_off telemetry_leave fetch_peer render_telemetry
 done
 
 # What those functions read, pointed into the scratch directory.
-# shellcheck disable=SC2034
-{
-  WG_IFACE=wg-watchtower
-  WG_DIR="${work}/wireguard"
-  WG_CONF="${WG_DIR}/wg-watchtower.conf"
-  ALLOY_CONF="${work}/alloy/config.alloy"
-  RENDER_DIR="${work}/quadlets"
-  STATE_DIR="${work}/state"
-  WATCHTOWER_PROJECT=watchtower-observe
-  WATCHTOWER_PEER_SECRET=wireguard-blog-vm-peer
-  PEER_META_READ=1
-  PEER_FETCH_ERROR=""
-  TELEMETRY_ON=0
-}
+WG_IFACE=wg-watchtower
+WG_DIR="${work}/wireguard"
+WG_CONF="${WG_DIR}/wg-watchtower.conf"
+ALLOY_CONF="${work}/alloy/config.alloy"
+RENDER_DIR="${work}/quadlets"
+STATE_DIR="${work}/state"
+WATCHTOWER_PROJECT=watchtower-observe
+WATCHTOWER_PEER_SECRET=wireguard-blog-vm-peer
+PEER_META_READ=1
+PEER_FETCH_ERROR=""
+TELEMETRY_ON=0
 
 log() { echo "log: $*" >&2; }
 warn() { echo "warn: $*" >&2; }

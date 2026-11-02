@@ -68,6 +68,16 @@ Alloy (host network) ──► wg-watchtower (10.8.0.134) ──► UDP to the p
   internet.
 - **Write only.** At the other end, watchtower lets this peer reach only
   its ingest listeners and write paths, in the tenant `jasonmross`.
+- **Alloy keeps off the metadata server.** Its token is this VM's
+  credentials, and Alloy has no use for it, so `host.nft`'s output chain
+  refuses uid 473 there. Port 53 still goes through: that address is also
+  GCE's resolver, and Alloy has to look up watchtower. One uid and no more,
+  since Caddy needs the server for DNS-01 and root for `gcloud`. This holds
+  because Alloy is on the host network with no user namespace, so its
+  packets leave through the output chain under that uid; a bridged
+  container's are forwarded and never meet it.
+  `scripts/check-metadata-guard.sh` loads the ruleset in a throwaway
+  namespace and checks who gets through.
 - **Loopback listeners.** Caddy's metrics (`:2020`) are on the host's
   loopback in either Caddy mode: bound there on the host network, published
   as `127.0.0.1:2020` from the bridge. Alloy's UI is `127.0.0.1:12345`.

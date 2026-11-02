@@ -41,7 +41,9 @@ Volume=alloy-data.volume:/var/lib/alloy/data
 Volume=/var/log/journal:/var/log/journal:ro
 Volume=/etc/machine-id:/etc/machine-id:ro
 # The host's view for prometheus.exporter.unix, read-only. Root-only files
-# stay unreadable: Alloy runs as uid 473 with no capabilities.
+# stay unreadable: Alloy runs as uid 473 with no capabilities. vm/nftables/host.nft
+# keeps that uid off the metadata server, which relies on User=473, the host
+# network and no UserNS= here (make check-metadata-guard).
 Volume=/proc:/host/proc:ro
 Volume=/sys:/host/sys:ro
 Volume=/:/host/root:ro,rslave
