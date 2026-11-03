@@ -213,6 +213,7 @@ WATCHTOWER_PEER_SECRET=wireguard-blog-vm-peer
 PEER_META_READ=1
 PEER_FETCH_ERROR=""
 TELEMETRY_ON=0
+JOURNAL_ACCESS_CHANGED=0
 
 log() { echo "log: $*" >&2; }
 warn() { echo "warn: $*" >&2; }
@@ -441,6 +442,13 @@ grep -q 'restart alloy.service' "${work}/calls" || { echo "a first config didn't
 go "the same config again"
 grep -q "restart" "${work}/calls" && { echo "the same config restarted something"; bad=1; }
 grep -q "start wg-quick@${WG_IFACE}" "${work}/calls" || { echo "the same config didn't start the tunnel"; bad=1; }
+# A repaired journal: Alloy has to reopen it, and the tunnel has no reason to drop.
+JOURNAL_ACCESS_CHANGED=1
+: >"${work}/calls"
+go "the same config, with the journal's access just repaired"
+grep -q "restart alloy.service" "${work}/calls" || { echo "repaired journal access didn't restart Alloy"; bad=1; }
+grep -q "restart wg-quick@${WG_IFACE}" "${work}/calls" && { echo "repaired journal access restarted the tunnel"; bad=1; }
+JOURNAL_ACCESS_CHANGED=0
 SECRET=changed
 : >"${work}/calls"
 go "a changed config"
