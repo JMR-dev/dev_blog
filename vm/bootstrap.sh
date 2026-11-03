@@ -166,17 +166,36 @@ install_packages() {
 # cursor (alloy-data.volume) still points into the journal; capped, so the boot
 # disk keeps its room. Runs in both modes, like the firewall: a pushed change
 # applies on the next sync.
+JOURNAL_ACCESS_CHANGED=0
+
 setup_journald() {
     local conf=/etc/systemd/journald.conf.d/50-blog.conf
-    if cmp -s "${STATE_DIR}/journald/50-blog.conf" "${conf}"; then
+    if ! cmp -s "${STATE_DIR}/journald/50-blog.conf" "${conf}"; then
+        log "configuring journald"
+        install -d -m 0755 /etc/systemd/journald.conf.d
+        install -m 0644 "${STATE_DIR}/journald/50-blog.conf" "${conf}"
+        systemctl restart systemd-journald || warn "journald did not restart"
+        # Moves anything still in /run/log/journal to /var/log/journal.
+        journalctl --flush || warn "journal flush failed"
+    fi
+    fix_journal_access
+}
+
+# journald makes /var/log/journal root:root when it creates it, and the
+# systemd-journal group only arrives from systemd-tmpfiles at the next boot.
+# Until then Alloy, which reads through that group, can open no journal file,
+# and still reports healthy with no lines. This does now what that boot would do.
+# Outside the check above, so a VM already in that state is repaired too; Alloy
+# restarts (render_telemetry), so that it opens the files it can now read.
+fix_journal_access() {
+    local group
+    group=$(stat -c %G /var/log/journal 2>/dev/null) || group=""
+    if [[ "${group}" == "systemd-journal" ]]; then
         return 0
     fi
-    log "configuring journald"
-    install -d -m 0755 /etc/systemd/journald.conf.d
-    install -m 0644 "${STATE_DIR}/journald/50-blog.conf" "${conf}"
-    systemctl restart systemd-journald || warn "journald did not restart"
-    # Moves anything still in /run/log/journal to /var/log/journal.
-    journalctl --flush || warn "journal flush failed"
+    log "giving the systemd-journal group its access to /var/log/journal"
+    systemd-tmpfiles --create --prefix=/var/log/journal || warn "systemd-tmpfiles failed on /var/log/journal"
+    JOURNAL_ACCESS_CHANGED=1
 }
 
 # ---------------------------------------------------------------------------
@@ -916,8 +935,8 @@ render_telemetry() {
         systemctl start "wg-quick@${WG_IFACE}.service" || warn "the watchtower tunnel did not come up"
     fi
     # Quadlet units have no enable: [Install] takes effect at daemon-reload.
-    if (( alloy_changed || tunnel_changed )); then
-        log "the watchtower tunnel or Alloy changed -- restarting Alloy"
+    if (( alloy_changed || tunnel_changed || JOURNAL_ACCESS_CHANGED )); then
+        log "the watchtower tunnel, Alloy or its journal access changed -- restarting Alloy"
         systemctl restart alloy.service || warn "Alloy did not restart cleanly"
     else
         systemctl start alloy.service || warn "Alloy did not start"
