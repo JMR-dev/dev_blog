@@ -404,11 +404,13 @@ jobs:
           docker rm -f smoke >/dev/null
           [[ -n "$ok" ]] || { echo "site image did not serve / as uid 1000 on a read-only root" >&2; exit 1; }
           [[ "$marker" == "$SITE_BUILD" ]] || { echo "site image serves build marker '$marker', not '$SITE_BUILD'" >&2; exit 1; }
+          # Also before the push: fails on any fixable HIGH/CRITICAL finding.
+          scripts/scan-image.sh "$AR/blog:prod"
           docker push --all-tags "$AR/blog"
           # Rollback targets: re-point :prod at one of these (docs/runbook.md).
           docker image inspect "$AR/blog:prod" --format '{{index .RepoDigests 0}}'
       - if: env.CADDY == 'true'
-        name: Build and push the edge Caddy image
+        name: Build, scan and push the edge Caddy image
         run: |
           # The Dockerfile asserts the googleclouddns and Coraza modules are
           # present, so a dropped plugin fails here, not at request time.
@@ -416,6 +418,7 @@ jobs:
             --build-arg "CADDY_VERSION=$CADDY_VERSION" \
             --build-arg "CORAZA_VERSION=$CORAZA_VERSION" \
             --tag "$AR/caddy:prod" --tag "$AR/caddy:$SHORT_SHA" --tag "$AR/caddy:$CADDY_VERSION"
+          scripts/scan-image.sh "$AR/caddy:prod"
           docker push --all-tags "$AR/caddy"
           docker image inspect "$AR/caddy:prod" --format '{{index .RepoDigests 0}}'
 

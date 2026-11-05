@@ -35,11 +35,11 @@ dev: ## Build and run the site locally behind the WAF (podman compose)
 .PHONY: check
 check: ## Build, vet and test the Pulumi program; syntax-check and lint the shell scripts
 	cd infra && go build -o blog-infra . && go vet ./... && go test ./...
-	bash -n vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh scripts/check-alloy-scrub.sh scripts/check-peer-config.sh scripts/check-metadata-guard.sh
+	bash -n vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh scripts/check-alloy-scrub.sh scripts/check-peer-config.sh scripts/check-metadata-guard.sh scripts/scan-image.sh
 	@# if/else, not `a && b || c`: the latter reports "not installed" and exits 0
 	@# when shellcheck runs and FINDS something, so CI would never fail on it.
 	@if command -v shellcheck >/dev/null; then \
-		shellcheck -S warning vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh scripts/check-alloy-scrub.sh scripts/check-peer-config.sh scripts/check-metadata-guard.sh; \
+		shellcheck -S warning vm/startup.sh vm/bootstrap.sh scripts/bootstrap.sh scripts/vm-rollout.sh scripts/check-alloy-scrub.sh scripts/check-peer-config.sh scripts/check-metadata-guard.sh scripts/scan-image.sh; \
 	else echo "shellcheck not installed -- skipped"; fi
 
 # The Alloy config is a template: fmt checks it as written, validate checks it
