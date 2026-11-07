@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# The blog: Astro's static build, served by a stock Caddy as a plain file
+# The blog: Astro's static build, served by a plugin-free Caddy as a plain file
 # server. TLS, the WAF and security headers are the EDGE Caddy's job
 # (image/caddy/, vm/config/Caddyfile.tmpl); this one only answers HTTP on 8080
 # behind it.
@@ -19,8 +19,8 @@
 # weekly rebuild picks them up. Only the build stage runs on it.
 ARG NODE_TAG=26-alpine
 ARG DEBIAN_TAG=13-slim
-# Used in a FROM line, so it has to be declared here, before the first FROM.
-ARG CADDY_VERSION
+# The same Go minor as infra/go.mod's toolchain line and image/caddy/Dockerfile.
+ARG GOLANG_TAG=1.27-trixie
 
 # ---------------------------------------------------------------------------
 # Stage 1: build the site.
@@ -50,17 +50,38 @@ RUN pnpm run build
 
 # ---------------------------------------------------------------------------
 # Stage 2: the Caddy binary. The same release as the edge (image/caddy.version),
-# so there is one Caddy version to track; the stock binary is enough here --
-# no plugins.
+# so there is one Caddy version to track; no plugins here.
 #
-# The official image ships it with a cap_net_bind_service FILE capability. Under
-# the quadlet's NoNewPrivileges + DropCapability=ALL, exec'ing a binary that
-# carries file capabilities fails outright ("Operation not permitted"), and
-# this server only binds 8080, so strip it rather than loosen the container.
+# Built from source with xcaddy, like the edge, rather than copied out of the
+# official caddy image: that binary keeps the Go release and modules it was
+# built with, and scripts/scan-image.sh fails this image on them. (2.11.7's
+# carries Go 1.26.8's stdlib CVEs and the old x/net and go-jose below; no
+# setting here can change them.) A source build takes the current Go 1.27 and
+# GO_MODULE_PINS. It also has none of the official binary's
+# cap_net_bind_service file capability, which the quadlet's NoNewPrivileges +
+# DropCapability=ALL refuse to exec ("Operation not permitted").
 # ---------------------------------------------------------------------------
-FROM docker.io/library/caddy:${CADDY_VERSION}-alpine AS caddy
+FROM golang:${GOLANG_TAG} AS caddy
 
-RUN apk add --no-cache libcap-utils && setcap -r /usr/bin/caddy
+ARG CADDY_VERSION
+ARG XCADDY_VERSION=v0.4.7
+# The same list as image/caddy/Dockerfile, which says what each pin is for:
+# change both.
+ARG GO_MODULE_PINS="golang.org/x/net@v0.62.0 github.com/go-jose/go-jose/v4@v4.1.7"
+
+ENV CGO_ENABLED=0 \
+    GOTOOLCHAIN=local
+
+RUN set -eux; \
+    test -n "${CADDY_VERSION}" || { echo "CADDY_VERSION build-arg is required" >&2; exit 1; }; \
+    go install "github.com/caddyserver/xcaddy/cmd/xcaddy@${XCADDY_VERSION}"
+
+RUN set -eux; \
+    # GO_MODULE_PINS, one --replace per pin, collected in "$@".
+    set --; \
+    for pin in ${GO_MODULE_PINS}; do set -- "$@" --replace "${pin%@*}=${pin}"; done; \
+    xcaddy build "v${CADDY_VERSION}" "$@" --output /out/caddy; \
+    /out/caddy version
 
 # ---------------------------------------------------------------------------
 # Stage 3: serve it.
@@ -85,7 +106,7 @@ RUN set -eux; \
     # denied"). Buildah does not, so a local podman build hid it.
     install -d -m 0755 /etc/caddy
 
-COPY --from=caddy --chown=root:root --chmod=0755 /usr/bin/caddy /usr/local/bin/caddy
+COPY --from=caddy --chown=root:root --chmod=0755 /out/caddy /usr/local/bin/caddy
 
 # Caddy keeps autosave/ACME state under XDG dirs. Neither is wanted here (no
 # admin API, no TLS), but point them at the tmpfs so a read-only root never
