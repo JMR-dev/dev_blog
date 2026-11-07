@@ -22,6 +22,17 @@ FROM golang:${GOLANG_TAG} AS build
 ARG CADDY_VERSION
 ARG CORAZA_VERSION
 ARG XCADDY_VERSION=v0.4.7
+# Go modules forced past what Caddy and its plugins require, each for a
+# fixable HIGH that scripts/scan-image.sh would otherwise fail the image on.
+# Each becomes `xcaddy build --replace module=module@version`. Drop a pin once
+# image/caddy.version's Caddy requires that version or newer by itself.
+# image/app/Dockerfile carries the same list for the site's Caddy: change both.
+#   golang.org/x/net              v0.62.0  CVE-2026-78661 (x/net/html; fixed in
+#                                          v0.62.0), CVE-2026-78669 (x/net/http2;
+#                                          fixed in v0.60.0). Caddy 2.11.7: v0.59.0.
+#   github.com/go-jose/go-jose/v4 v4.1.7   CVE-2026-116587 (fixed in v4.1.6).
+#                                          Caddy 2.11.7: v4.1.5.
+ARG GO_MODULE_PINS="golang.org/x/net@v0.62.0 github.com/go-jose/go-jose/v4@v4.1.7"
 
 ENV CGO_ENABLED=0 \
     GOTOOLCHAIN=local
@@ -32,9 +43,13 @@ RUN set -eux; \
     go install "github.com/caddyserver/xcaddy/cmd/xcaddy@${XCADDY_VERSION}"
 
 RUN set -eux; \
+    # GO_MODULE_PINS, one --replace per pin, collected in "$@".
+    set --; \
+    for pin in ${GO_MODULE_PINS}; do set -- "$@" --replace "${pin%@*}=${pin}"; done; \
     xcaddy build "v${CADDY_VERSION}" \
         --with github.com/caddy-dns/googleclouddns \
         --with "github.com/corazawaf/coraza-caddy/v2@${CORAZA_VERSION}" \
+        "$@" \
         --output /out/caddy; \
     /out/caddy version; \
     # Assert BOTH modules landed. It is easy to drop one when editing the build

@@ -25,7 +25,7 @@ Two containers on one VM, both run by systemd through podman [quadlets](https://
 Internet ──► VPC firewall ──► nftables ──► Caddy :443 (TLS, WAF, headers) ──► site :8080 (static files)
 ```
 
-- **Site** (`image/app/`) — `astro build` in a Node 26 (Alpine) stage, then the output served by a stock Caddy file server on Debian slim. Runs as uid 1000 with a read-only root, all capabilities dropped and `no-new-privileges`.
+- **Site** (`image/app/`) — `astro build` in a Node 26 (Alpine) stage, then the output served by a plugin-free Caddy file server on Debian slim (built with xcaddy like the edge, so both binaries take the current Go and the same Go module pins). Runs as uid 1000 with a read-only root, all capabilities dropped and `no-new-privileges`.
 - **Edge** (`image/caddy/`) — Caddy built with [`xcaddy`](https://github.com/caddyserver/xcaddy) and two plugins:
   - **[coraza-caddy](https://github.com/corazawaf/coraza-caddy)** — the Coraza WAF with the OWASP Core Rule Set embedded in the binary.
   - **[caddy-dns/googleclouddns](https://github.com/caddy-dns/googleclouddns)** — ACME DNS-01, so certificates are issued and renewed without inbound port 80. It authenticates as the VM's own service account; there is no key on the box.
