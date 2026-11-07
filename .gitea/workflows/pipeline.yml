@@ -383,6 +383,29 @@ jobs:
             # health gate derives the same value.
             echo "SITE_BUILD=${GITHUB_SHA::7}-${GITHUB_RUN_ID}"
           } >> "$GITHUB_ENV"
+      # The DinD runner's daemon keeps everything on one 20 Gi disk that every
+      # repository's `docker` jobs share, and nothing there prunes it (the
+      # gitea repo's infra/pkg/runner). Every build here is tagged :prod and
+      # :<sha>, so this repo's old images were never dangling and stayed until
+      # the disk filled (run 282: "no space left on device"). Each one is in
+      # Artifact Registry, the rollback source, so start from none. Only this
+      # repo's images: what the daemon keeps for other repositories, its build
+      # cache included, is the gitea repo's call. The df lines are the numbers
+      # that call needs; this container's / is on that disk.
+      - if: env.APP == 'true' || env.CADDY == 'true'
+        name: Remove this repo's old images from the runner
+        run: |
+          df -h /
+          docker system df
+          # One id per image, however many of this repo's tags it carries.
+          ids=$( { docker image ls -q "$AR/blog"; docker image ls -q "$AR/caddy"; } | sort -u)
+          if [[ -n "$ids" ]]; then
+            echo "removing $(wc -l <<<"$ids") of this repo's images"
+            xargs docker image rm -f <<<"$ids" >/dev/null \
+              || echo "::warning::some of this repo's old images could not be removed"
+          fi
+          df -h /
+          docker system df
       - if: env.APP == 'true'
         name: Build and push the site image
         run: |
@@ -423,6 +446,18 @@ jobs:
           scripts/scan-image.sh "$AR/caddy:prod"
           docker push --all-tags "$AR/caddy"
           docker image inspect "$AR/caddy:prod" --format '{{index .RepoDigests 0}}'
+      # And leave none of this run's behind: what passed is in the registry,
+      # what failed is not wanted. Runs when a build or scan failed too.
+      - if: always() && (env.APP == 'true' || env.CADDY == 'true')
+        name: Remove this run's images from the runner
+        run: |
+          ids=$( { docker image ls -q "$AR/blog"; docker image ls -q "$AR/caddy"; } | sort -u)
+          if [[ -n "$ids" ]]; then
+            xargs docker image rm -f <<<"$ids" >/dev/null \
+              || echo "::warning::some of this run's images could not be removed"
+          fi
+          df -h /
+          docker system df
 
   rollout:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
