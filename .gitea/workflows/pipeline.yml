@@ -44,9 +44,11 @@ on:
     branches: [main]
   workflow_dispatch:
   # Weekly image rebuild: the only thing that picks up base-image security
-  # fixes under the floating :prod tags.
+  # fixes under the floating :prod tags. Saturday 04:00 UTC, not Sunday:
+  # Gitea's own weekly rebuild stops Gitea and its Caddy at Sunday 04:00 UTC,
+  # and this run's jobs execute on Gitea's runners.
   schedule:
-    - cron: "0 4 * * 0"
+    - cron: "0 4 * * 6"
 
 # On a PR a newer push supersedes the run in progress: nothing there deploys.
 # Anywhere else runs queue instead -- cancelling a `pulumi up` part-way leaves
@@ -93,7 +95,7 @@ jobs:
             pull_request) base="$PR_BASE" ;;
             push)         base="$PUSH_BEFORE" ;;
             # The weekly run only rebuilds images on fresh base layers. An
-            # unattended `pulumi up` every Sunday is not what it is for.
+            # unattended `pulumi up` every week is not what it is for.
             schedule)     printf 'app=true\ncaddy=true\ninfra=false\ne2e=false\n' >> "$GITHUB_OUTPUT"; echo "scheduled image rebuild"; exit 0 ;;
             *)            all "$EVENT"; exit 0 ;;
           esac
